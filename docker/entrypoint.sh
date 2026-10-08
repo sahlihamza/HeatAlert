@@ -8,24 +8,21 @@ export PORT
 
 echo "[entrypoint] HeatAlert demarre sur le port ${PORT} (env: ${APP_ENV:-production})"
 
-# Permissions ecritures (utile quand /var/www est monte en bind mount)
+# Permissions ecritures
 mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views \
          storage/logs storage/app/public bootstrap/cache
 chown -R www-data:www-data storage bootstrap/cache 2>/dev/null || true
 chmod -R ug+rwx storage bootstrap/cache 2>/dev/null || true
 
-# Recree le symlink public/storage (exclu du build car casse sous Windows)
+# Recree le symlink public/storage
 if [ ! -e public/storage ]; then
     rm -f public/storage 2>/dev/null || true
     ln -s ../storage/app/public public/storage
 fi
 
-# Prepare un .env minimal si absent.
-# L'image est construite SANS .env (exclu par .dockerignore). Sans .env :
-#   - key:generate --force echoue silencieusement -> APP_KEY absente -> 500
-#   - DB_* absentes -> Laravel default sur sqlite inexistant -> 500
+# Prepare un .env minimal si absent
 if [ ! -f .env ]; then
-    echo "[entrypoint] Aucun .env detecte -> generation dun .env minimal depuis les variables denv"
+    echo "[entrypoint] Aucun .env detecte -> generation dun .env minimal"
     {
         echo "APP_NAME=HeatAlert"
         echo "APP_ENV=${APP_ENV:-production}"
@@ -47,26 +44,31 @@ if [ ! -f .env ]; then
         echo "FILESYSTEM_DISK=local"
         echo "MAIL_MAILER=${MAIL_MAILER:-log}"
     } > .env
-    chown www-data:www-data .env 2>/dev/null || true
-    chmod 644 .env 2>/dev/null || true
 fi
 
-# Generation dune cle si aucune nest fournie (le .env existe desormais)
-if ! grep -q '^APP_KEY=base64:' .env 2>/dev/null && [ -z "$APP_KEY" ]; then
-    echo "[entrypoint] Aucun APP_KEY -> generation via artisan key:generate"
-    php artisan key:generate --force >/dev/null 2>&1 || true
-    chown www-data:www-data .env 2>/dev/null || true
-    chmod 644 .env 2>/dev/null || true
+# Genere une APP_KEY valide (32 octets base64) si absente de .env ET de lenv.
+# On le fait MANUELLEMENT (pas via artisan) pour eviter les echecs silencieux.
+if ! grep -q '^APP_KEY=base64:.' .env 2>/dev/null && [ -z "$APP_KEY" ]; then
+    echo "[entrypoint] Generation manuelle dune APP_KEY (32 octets base64)..."
+    KEY_B64=$(php -r "echo base64_encode(random_bytes(32));")
+    KEY_FULL="base64:${KEY_B64}"
+    echo "APP_KEY=${KEY_FULL}" >> .env
+    # Lexporter dans lenv php-fpm (qui herite de lenv du shell parent)
+    export APP_KEY="${KEY_FULL}"
+    echo "[entrypoint] APP_KEY generee et exportee (prefixe: ${KEY_B64})"
 fi
 
-# Diagnostics de demarrage (aident a deboguer sur Render)
-echo "[entrypoint] APP_KEY presente : $(grep -q '^APP_KEY=base64:' .env 2>/dev/null && echo OUI || echo NON)"
+chown www-data:www-data .env 2>/dev/null || true
+chmod 644 .env 2>/dev/null || true
+
+# Diagnostics
+echo "[entrypoint] APP_KEY presente : $(grep -q '^APP_KEY=base64:.' .env 2>/dev/null && echo OUI || echo NON)"
 echo "[entrypoint] DB_CONNECTION    : ${DB_CONNECTION:-non defini (default sqlite !)}"
 echo "[entrypoint] DB_HOST          : ${DB_HOST:-non defini}"
 echo "[entrypoint] DB_PORT          : ${DB_PORT:-non defini}"
 echo "[entrypoint] SESSION_DRIVER   : ${SESSION_DRIVER:-non defini (default database)}"
 
-# Test de connexion DB (non bloquant, diagnostique uniquement)
+# Test de connexion DB (non bloquant)
 if [ "${DB_CONNECTION:-sqlite}" = "mysql" ] && [ -n "$DB_HOST" ]; then
     echo "[entrypoint] Test connexion MySQL ${DB_HOST}:${DB_PORT:-3306}..."
     php artisan db:monitor --timeout=5 2>/dev/null \
@@ -74,7 +76,7 @@ if [ "${DB_CONNECTION:-sqlite}" = "mysql" ] && [ -n "$DB_HOST" ]; then
         || echo "[entrypoint] MySQL injoignable (verifiez DB_HOST/DB_PORT dans Render)"
 fi
 
-# Migrations au demarrage (Render na pas acces a artisan sur le host)
+# Migrations
 if [ "$RUN_MIGRATIONS" = "true" ]; then
     echo "[entrypoint] php artisan migrate --force"
     if ! php artisan migrate --force; then
@@ -87,7 +89,7 @@ else
     php artisan config:clear >/dev/null 2>&1 || true
 fi
 
-# php-fpm en mode demon (PID ecrit dans /usr/local/var/run)
+# php-fpm en mode demon (herite de lenv du shell, y compris APP_KEY exportee)
 php-fpm -D
 
 # nginx : genere la conf depuis le template (substitution de PORT)
@@ -98,5 +100,5 @@ for t in /etc/nginx/templates/*.template; do
     echo "[entrypoint] nginx conf -> $out (port $PORT)"
 done
 
-# nginx en avant-plan -> recoit SIGTERM a larret du conteneur
+# nginx en avant-plan
 nginx -g 'daemon off;'
