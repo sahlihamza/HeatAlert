@@ -55,7 +55,7 @@ if ! grep -q '^APP_KEY=base64:.' .env 2>/dev/null && [ -z "$APP_KEY" ]; then
     echo "APP_KEY=${KEY_FULL}" >> .env
     # Lexporter dans lenv php-fpm (qui herite de lenv du shell parent)
     export APP_KEY="${KEY_FULL}"
-    echo "[entrypoint] APP_KEY generee et exportee (prefixe: ${KEY_B64})"
+    echo "[entrypoint] APP_KEY generee et exportee (prefixe: $(echo "$KEY_B64" | cut -c1-8)...)"
 fi
 
 chown www-data:www-data .env 2>/dev/null || true
