@@ -68,6 +68,9 @@ jobs:
       - name: Run migrations
         run: php artisan migrate --force
 
+      - name: Verify migrations status
+        run: php artisan migrate:status
+
       - name: Run tests
         run: php artisan test
 
