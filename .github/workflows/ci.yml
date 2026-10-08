@@ -31,8 +31,15 @@ jobs:
           --health-timeout=5s
           --health-retries=5
 
-    steps:
+    env:
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: heatalert
+      DB_USERNAME: heatalert
+      DB_PASSWORD: heatalert_password
 
+    steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -49,22 +56,11 @@ jobs:
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
-           - name: Prepare Laravel environment
+      - name: Prepare Laravel environment
         run: |
           cp .env.example .env
           php artisan key:generate
-
-      - name: Configure database
-        run: |
-          sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=mysql/' .env
-          sed -i 's/^DB_HOST=.*/DB_HOST=127.0.0.1/' .env
-          sed -i 's/^DB_PORT=.*/DB_PORT=3306/' .env
-          sed -i 's/^DB_DATABASE=.*/DB_DATABASE=heatalert/' .env
-          sed -i 's/^DB_USERNAME=.*/DB_USERNAME=heatalert/' .env
-          sed -i 's/^DB_PASSWORD=.*/DB_PASSWORD=heatalert_password/' .env
-
-      - name: Clear Laravel configuration cache
-        run: php artisan config:clear
+          php artisan config:clear
 
       - name: Verify Laravel database configuration
         run: php artisan config:show database
@@ -81,7 +77,6 @@ jobs:
     needs: tests
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
