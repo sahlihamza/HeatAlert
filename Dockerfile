@@ -2,7 +2,11 @@ FROM php:8.2-fpm
 
 WORKDIR /var/www
 
-RUN apt-get update && apt-get install -y \
+# Nginx + outils de santé/entrée dans la même image que PHP-FPM
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nginx \
+    curl \
+    gettext-base \
     git \
     unzip \
     libzip-dev \
@@ -17,7 +21,7 @@ RUN apt-get update && apt-get install -y \
     pcntl \
     bcmath \
     gd \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean && rm -rf /var/lib/apt/lists/* /var/www/html
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
@@ -29,8 +33,23 @@ RUN composer install \
     --prefer-dist \
     --optimize-autoloader
 
-RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
+# Entrypoint et template nginx hors de /var/www : survivent au bind mount de docker-compose
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY nginx/default.conf /etc/nginx/templates/default.conf.template
 
-EXPOSE 9000
+RUN chmod +x /usr/local/bin/entrypoint.sh \
+    && rm -f /etc/nginx/sites-enabled/default /etc/nginx/conf.d/default.conf
 
-CMD ["php-fpm"]
+# Écritures Laravel (sessions, cache, logs, vues compilées) + symlink storage public
+RUN mkdir -p storage/framework/{cache,sessions,views} storage/logs storage/app/public bootstrap/cache \
+    && rm -f public/storage \
+    && ln -s ../storage/app/public public/storage \
+    && chown -R www-data:www-data storage bootstrap/cache
+
+ENV PORT=8080
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -fsS "http://127.0.0.1:${PORT}/up" || exit 1
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

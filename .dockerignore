@@ -11,3 +11,7 @@ storage/framework/views/*
 Dockerfile
 docker-compose.yml
 README.md
+tests
+scriptdatabase.sql
+.phpunit.result.cache
+public/storage
