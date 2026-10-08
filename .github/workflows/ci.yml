@@ -78,7 +78,7 @@ jobs:
       - name: Run tests
         run: php artisan test
 
-    docker:
+  docker:
     name: Build and Publish Docker Image
     runs-on: ubuntu-latest
     needs: tests
@@ -114,3 +114,4 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
