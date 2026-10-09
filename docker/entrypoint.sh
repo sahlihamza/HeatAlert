@@ -116,10 +116,16 @@ fi
 if [ "$RUN_SEED" = "true" ] && [ "$RUN_MIGRATIONS" = "true" ]; then
     echo "[entrypoint] RUN_SEED=true -> verification table par table..."
     SEED_NEEDED=""
-    for _t in zones:ZoneSeeder users:AdminSeeder alerte_meteos:AlerteMeteoSeeder conseils:ConseilSeeder coupures:CoupureSeeder point_fraicheurs:PointFraicheurSeeder; do
+    for _t in zones:ZoneSeeder users:AdminSeeder alertes_meteo:AlerteMeteoSeeder conseils:ConseilSeeder coupures:CoupureSeeder points_fraicheur:PointFraicheurSeeder; do
         _table="${_t%%:*}"; _seeder="${_t#*:}"
         _count=$(php artisan tinker --execute="echo (int) DB::table('${_table}')->count();" 2>/dev/null | grep -Eo '[0-9]+' | tail -1)
-        echo "[entrypoint] table ${_table} : ${_count:-inconnu} ligne(s)"
+        # Si la table n'existe pas (migrations pas encore passees), tinker
+        # echoue -> _count vide : on ne seed pas cette table a ce boot.
+        if [ -z "$_count" ]; then
+            echo "[entrypoint] table ${_table} : table absente, skip"
+            continue
+        fi
+        echo "[entrypoint] table ${_table} : ${_count} ligne(s)"
         if [ "${_count:-x}" = "0" ]; then
             SEED_NEEDED="${SEED_NEEDED} ${_seeder}"
         fi
