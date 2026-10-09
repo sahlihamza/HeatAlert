@@ -114,7 +114,9 @@ fi
 # Activer avec RUN_SEED=true (puis retirer la variable apres le 1er boot).
 if [ "$RUN_SEED" = "true" ] && [ "$RUN_MIGRATIONS" = "true" ]; then
     echo "[entrypoint] RUN_SEED=true -> verification du seed initial..."
-    if php artisan tinker --execute="echo App\Models\Zone::count();" 2>/dev/null | grep -q '^0'; then
+    ZONES_COUNT=$(php artisan tinker --execute="echo (int) App\Models\Zone::count();" 2>/dev/null | grep -Eo '[0-9]+' | tail -1)
+    echo "[entrypoint] zones en base : ${ZONES_COUNT:-inconnu}"
+    if [ "${ZONES_COUNT:-x}" = "0" ]; then
         echo "[entrypoint] DB vide -> php artisan db:seed --force"
         php artisan db:seed --force \
             && echo "[entrypoint] seed OK (retirez RUN_SEED de Render)" \
@@ -122,6 +124,8 @@ if [ "$RUN_SEED" = "true" ] && [ "$RUN_MIGRATIONS" = "true" ]; then
     else
         echo "[entrypoint] DB deja seedee -> skip (retirez RUN_SEED de Render)"
     fi
+elif [ "$RUN_SEED" = "true" ]; then
+    echo "[entrypoint] RUN_SEED=true ignore : activez RUN_MIGRATIONS=true aussi"
 fi
 
 # php-fpm en mode demon (herite de lenv du shell, y compris APP_KEY exportee)
