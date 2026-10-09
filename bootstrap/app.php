@@ -11,6 +11,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Render termine le TLS a son proxy : on lui fait confiance
+        // pour que asset()/url() generent du https (X-Forwarded-Proto).
+        $middleware->trustProxies(at: '*');
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
         ]);

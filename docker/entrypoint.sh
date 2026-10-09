@@ -27,7 +27,7 @@ if [ ! -f .env ]; then
         echo "APP_NAME=HeatAlert"
         echo "APP_ENV=${APP_ENV:-production}"
         echo "APP_DEBUG=${APP_DEBUG:-false}"
-        echo "APP_URL=${APP_URL:-https://heatalert-web.onrender.com}"
+        echo "APP_URL=${APP_URL:-https://heatalert.onrender.com}"
         echo "LOG_CHANNEL=stderr"
         echo "LOG_LEVEL=info"
         echo "DB_CONNECTION=${DB_CONNECTION:-mysql}"
@@ -55,7 +55,9 @@ if ! grep -q '^APP_KEY=base64:.' .env 2>/dev/null; then
 fi
 APP_KEY=$(grep '^APP_KEY=' .env 2>/dev/null | cut -d= -f2-)
 export APP_KEY
-echo "env[APP_KEY] = ${APP_KEY}" > /usr/local/etc/php-fpm.d/zz-appkey.conf
+# NB : pas de zz-appkey.conf -> Laravel lit APP_KEY depuis /var/www/.env
+# directement ; un fichier pool fpm sans en-tete [www] faisait echouer FPM.
+rm -f /usr/local/etc/php-fpm.d/zz-appkey.conf 2>/dev/null || true
 chown www-data:www-data .env 2>/dev/null || true
 chmod 644 .env 2>/dev/null || true
 
