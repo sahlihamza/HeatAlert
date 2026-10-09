@@ -108,21 +108,31 @@ else
     php artisan config:clear >/dev/null 2>&1 || true
 fi
 
-# Seed initial "one-shot" : lance une seule fois quand la DB vient d'etre
-# creee (compteur zones = 0). Idempotent : les seeders cles utilisent
-# updateOrCreate, donc un re-run ne cree pas de doublons.
-# Activer avec RUN_SEED=true (puis retirer la variable apres le 1er boot).
+# Seed initial : complete les tables manquantes (garde PAR TABLE, pas global).
+# Sur un seed partiel (ex. zones OK mais conseils vides), seules les tables
+# vides sont seedee. Les seeders factory (conseils, alertes supplementaires,
+# coupures) ne tournent que si leur table est vide -> pas de doublons.
+# Desactive avec RUN_SEED=false (ou retirez la variable) une fois termine.
 if [ "$RUN_SEED" = "true" ] && [ "$RUN_MIGRATIONS" = "true" ]; then
-    echo "[entrypoint] RUN_SEED=true -> verification du seed initial..."
-    ZONES_COUNT=$(php artisan tinker --execute="echo (int) App\Models\Zone::count();" 2>/dev/null | grep -Eo '[0-9]+' | tail -1)
-    echo "[entrypoint] zones en base : ${ZONES_COUNT:-inconnu}"
-    if [ "${ZONES_COUNT:-x}" = "0" ]; then
-        echo "[entrypoint] DB vide -> php artisan db:seed --force"
-        php artisan db:seed --force \
-            && echo "[entrypoint] seed OK (retirez RUN_SEED de Render)" \
-            || echo "[entrypoint] seed en echec, relancez avec RUN_SEED=true"
+    echo "[entrypoint] RUN_SEED=true -> verification table par table..."
+    SEED_NEEDED=""
+    for _t in zones:ZoneSeeder users:AdminSeeder alerte_meteos:AlerteMeteoSeeder conseils:ConseilSeeder coupures:CoupureSeeder point_fraicheurs:PointFraicheurSeeder; do
+        _table="${_t%%:*}"; _seeder="${_t#*:}"
+        _count=$(php artisan tinker --execute="echo (int) DB::table('${_table}')->count();" 2>/dev/null | grep -Eo '[0-9]+' | tail -1)
+        echo "[entrypoint] table ${_table} : ${_count:-inconnu} ligne(s)"
+        if [ "${_count:-x}" = "0" ]; then
+            SEED_NEEDED="${SEED_NEEDED} ${_seeder}"
+        fi
+    done
+    if [ -n "$SEED_NEEDED" ]; then
+        echo "[entrypoint] seed des tables vides :${SEED_NEEDED}"
+        for _s in $SEED_NEEDED; do
+            php artisan db:seed --class="Database\\Seeders\\${_s}" --force \
+                || echo "[entrypoint] ATTENTION: seeder ${_s} en echec"
+        done
+        echo "[entrypoint] seed termine (retirez RUN_SEED de Render)"
     else
-        echo "[entrypoint] DB deja seedee -> skip (retirez RUN_SEED de Render)"
+        echo "[entrypoint] toutes les tables seedee -> skip (retirez RUN_SEED de Render)"
     fi
 elif [ "$RUN_SEED" = "true" ]; then
     echo "[entrypoint] RUN_SEED=true ignore : activez RUN_MIGRATIONS=true aussi"

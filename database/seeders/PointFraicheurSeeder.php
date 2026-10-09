@@ -35,7 +35,7 @@ class PointFraicheurSeeder extends Seeder
                 'horaires'       => '8h00 – 18h00, fermé le vendredi',
                 'accessible_pmr' => true,
                 'actif'          => true,
-                'zone_nom'       => 'Zone El Menzah',
+                'zone_nom'       => 'Zone Tunis Centre',
             ],
             [
                 'nom'            => 'Fontaine de la Place 7 Novembre',
@@ -46,7 +46,7 @@ class PointFraicheurSeeder extends Seeder
                 'horaires'       => '24h/24',
                 'accessible_pmr' => false,
                 'actif'          => true,
-                'zone_nom'       => 'Zone Sfax Centre',
+                'zone_nom'       => 'Zone Sfax',
             ],
             [
                 'nom'            => 'Piscine Municipale de Sousse',
@@ -57,7 +57,7 @@ class PointFraicheurSeeder extends Seeder
                 'horaires'       => '8h00 – 19h30',
                 'accessible_pmr' => true,
                 'actif'          => true,
-                'zone_nom'       => 'Zone Sousse Nord',
+                'zone_nom'       => 'Zone Sousse',
             ],
             [
                 'nom'            => 'Bibliothèque Nationale de Tunis',
@@ -90,7 +90,7 @@ class PointFraicheurSeeder extends Seeder
                 'horaires'       => '24h/24',
                 'accessible_pmr' => true,
                 'actif'          => true,
-                'zone_nom'       => 'Zone Sfax Centre',
+                'zone_nom'       => 'Zone Sfax',
             ],
             [
                 'nom'            => 'Espace Frais — Mairie de Nabeul',
