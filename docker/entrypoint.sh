@@ -46,18 +46,16 @@ if [ ! -f .env ]; then
     } > .env
 fi
 
-# Genere une APP_KEY valide (32 octets base64) si absente de .env ET de lenv.
-# On le fait MANUELLEMENT (pas via artisan) pour eviter les echecs silencieux.
-if ! grep -q '^APP_KEY=base64:.' .env 2>/dev/null && [ -z "$APP_KEY" ]; then
-    echo "[entrypoint] Generation manuelle dune APP_KEY (32 octets base64)..."
-    KEY_B64=$(php -r "echo base64_encode(random_bytes(32));")
-    KEY_FULL="base64:${KEY_B64}"
-    echo "APP_KEY=${KEY_FULL}" >> .env
-    # Lexporter dans lenv php-fpm (qui herite de lenv du shell parent)
-    export APP_KEY="${KEY_FULL}"
-    echo "[entrypoint] APP_KEY generee et exportee (prefixe: $(echo "$KEY_B64" | cut -c1-8)...)"
+# Genere une APP_KEY valide (32 octets base64) si absente de .env.
+# Fait en PHP pur (artisan exige deja une cle valide pour booter).
+if ! grep -q '^APP_KEY=base64:.' .env 2>/dev/null; then
+    echo "[entrypoint] Generation APP_KEY..."
+    KEY_B64=$(php -r 'echo base64_encode(random_bytes(32));')
+    printf 'APP_KEY=base64:%s\n' "$KEY_B64" >> .env
 fi
-
+APP_KEY=$(grep '^APP_KEY=' .env 2>/dev/null | cut -d= -f2-)
+export APP_KEY
+echo "env[APP_KEY] = ${APP_KEY}" > /usr/local/etc/php-fpm.d/zz-appkey.conf
 chown www-data:www-data .env 2>/dev/null || true
 chmod 644 .env 2>/dev/null || true
 
