@@ -107,6 +107,22 @@ else
     php artisan config:clear >/dev/null 2>&1 || true
 fi
 
+# Seed initial "one-shot" : lance une seule fois quand la DB vient d'etre
+# creee (compteur zones = 0). Idempotent : les seeders cles utilisent
+# updateOrCreate, donc un re-run ne cree pas de doublons.
+# Activer avec RUN_SEED=true (puis retirer la variable apres le 1er boot).
+if [ "$RUN_SEED" = "true" ] && [ "$RUN_MIGRATIONS" = "true" ]; then
+    echo "[entrypoint] RUN_SEED=true -> verification du seed initial..."
+    if php artisan tinker --execute="echo App\Models\Zone::count();" 2>/dev/null | grep -q '^0'; then
+        echo "[entrypoint] DB vide -> php artisan db:seed --force"
+        php artisan db:seed --force \
+            && echo "[entrypoint] seed OK (retirez RUN_SEED de Render)" \
+            || echo "[entrypoint] seed en echec, relancez avec RUN_SEED=true"
+    else
+        echo "[entrypoint] DB deja seedee -> skip (retirez RUN_SEED de Render)"
+    fi
+fi
+
 # php-fpm en mode demon (herite de lenv du shell, y compris APP_KEY exportee)
 php-fpm -D
 
