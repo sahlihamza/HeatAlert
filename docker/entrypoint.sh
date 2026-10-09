@@ -86,10 +86,11 @@ echo "[entrypoint] DB_HOST          : ${DB_HOST:-non defini}"
 echo "[entrypoint] DB_PORT          : ${DB_PORT:-non defini}"
 echo "[entrypoint] SESSION_DRIVER   : ${SESSION_DRIVER:-non defini (default database)}"
 
-# Test de connexion DB (non bloquant)
+# Test de connexion DB (non bloquant, PDO direct : db:monitor ne teste
+# pas la connectivite, il compte les connexions ouvertes)
 if [ "${DB_CONNECTION:-sqlite}" = "mysql" ] && [ -n "$DB_HOST" ]; then
     echo "[entrypoint] Test connexion MySQL ${DB_HOST}:${DB_PORT:-3306}..."
-    php artisan db:monitor --timeout=5 2>/dev/null \
+    php artisan tinker --execute="DB::connection()->getPdo(); echo 'OK';" >/dev/null 2>&1 \
         && echo "[entrypoint] MySQL joignable" \
         || echo "[entrypoint] MySQL injoignable (verifiez DB_HOST/DB_PORT dans Render)"
 fi
