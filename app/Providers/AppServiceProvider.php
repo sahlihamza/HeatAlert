@@ -8,25 +8,21 @@ use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
         //
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
         Paginator::useBootstrapFive();
 
-        // Filet anti mixed-content : en production (Render, TLS termine au
-        // proxy), toutes les URL generees (asset(), url(), route()) sont en https.
-        if (config('app.env') === 'production'
-            || str_starts_with((string) config('app.url'), 'https://')) {
+        // Anti mixed-content sur Render (TLS termine au proxy) :
+        // force https si env prod, APP_URL en https, ou FORCE_HTTPS=true
+        // ecrit par l'entrypoint Docker (disque Render persistant, .env fige).
+        if (app()->environment('production')
+            || str_starts_with((string) config('app.url'), 'https://')
+            || filter_var(env('FORCE_HTTPS', false), FILTER_VALIDATE_BOOLEAN)) {
             URL::forceScheme('https');
         }
     }

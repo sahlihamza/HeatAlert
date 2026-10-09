@@ -27,7 +27,12 @@ if [ ! -f .env ]; then
         echo "APP_NAME=HeatAlert"
         echo "APP_ENV=${APP_ENV:-production}"
         echo "APP_DEBUG=${APP_DEBUG:-false}"
-        echo "APP_URL=${APP_URL:-https://heatalert.onrender.com}"
+        # Forcer https QUOI QU'IL ARRIVE : APP_URL peut arriver vide ou en
+        # http depuis Render, et c'est lui qui declenche le mixed-content.
+        _APP_URL="${APP_URL:-https://heatalert.onrender.com}"
+        case "$_APP_URL" in http://*) _APP_URL="https://${_APP_URL#http://}";; esac
+        echo "APP_URL=${_APP_URL}"
+        echo "FORCE_HTTPS=true"
         echo "LOG_CHANNEL=stderr"
         echo "LOG_LEVEL=info"
         echo "DB_CONNECTION=${DB_CONNECTION:-mysql}"
@@ -60,6 +65,19 @@ export APP_KEY
 rm -f /usr/local/etc/php-fpm.d/zz-appkey.conf 2>/dev/null || true
 chown www-data:www-data .env 2>/dev/null || true
 chmod 644 .env 2>/dev/null || true
+
+# Synchronise les cles critiques a chaque boot (le .env peut etre fige
+# depuis un deploy precedent avec APP_URL en http ou APP_ENV=local).
+_APP_URL="${APP_URL:-https://heatalert.onrender.com}"
+case "$_APP_URL" in http://*) _APP_URL="https://${_APP_URL#http://}";; esac
+for _kv in "APP_ENV=${APP_ENV:-production}" "APP_URL=${_APP_URL}" "FORCE_HTTPS=true"; do
+    _k="${_kv%%=*}"; _v="${_kv#*=}"
+    if grep -q "^${_k}=" .env 2>/dev/null; then
+        sed -i "s|^${_k}=.*|${_k}=${_v}|" .env
+    else
+        printf '%s=%s\n' "$_k" "$_v" >> .env
+    fi
+done
 
 # Diagnostics
 echo "[entrypoint] APP_KEY presente : $(grep -q '^APP_KEY=base64:.' .env 2>/dev/null && echo OUI || echo NON)"
