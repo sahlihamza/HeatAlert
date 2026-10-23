@@ -113,22 +113,3 @@ jobs:
       - name: Run Feature Tests
         run: php artisan test --testsuite=Feature --stop-on-failure
 
-  deploy:
-    name: Deploy to Render
-    needs: [ci, test]
-    if: github.event_name == 'push'
-    runs-on: ubuntu-24.04
-
-    steps:
-      - name: Trigger Render deployment
-        env:
-          DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-        run: |
-          if [ -z "$DEPLOY_HOOK_URL" ]; then
-            echo "::error::GitHub Actions secret RENDER_DEPLOY_HOOK_URL is missing."
-            exit 1
-          fi
-
-          echo "Requesting Render deployment for branch ${GITHUB_REF_NAME}..."
-          curl --fail --silent --show-error --retry 3 --retry-delay 5 \
-            --request POST "$DEPLOY_HOOK_URL"
