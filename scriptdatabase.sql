@@ -27,12 +27,18 @@ CREATE TABLE users (
     prenom VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL,
     email_verified_at TIMESTAMP NULL,
+    email_verification_code VARCHAR(6) NULL,
+    email_verification_expires_at TIMESTAMP NULL,
     password VARCHAR(255) NOT NULL,
     telephone VARCHAR(20) NULL,
     role VARCHAR(255) NOT NULL DEFAULT 'ROLE_USER',
     date_inscription TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     zone_id BIGINT UNSIGNED NULL,
     remember_token VARCHAR(100) NULL,
+    two_factor_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    two_factor_secret TEXT NULL,
+    two_factor_code VARCHAR(6) NULL,
+    two_factor_expires_at TIMESTAMP NULL,
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
@@ -124,3 +130,42 @@ CREATE TABLE avis_points (
     CONSTRAINT avis_points_user_id_foreign FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     CONSTRAINT avis_points_point_id_foreign FOREIGN KEY (point_fraicheur_id) REFERENCES points_fraicheur (id) ON DELETE CASCADE
 ) ENGINE = InnoDB;
+
+-- 8. CHATBOT_CONVERSATIONS (Discussions avec le Chatbot HeatBot IA)
+CREATE TABLE chatbot_conversations (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id BIGINT UNSIGNED NULL,
+    session_id VARCHAR(128) NULL,
+    title VARCHAR(255) NOT NULL DEFAULT 'Nouvelle discussion',
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY chatbot_conversations_session_id_index (session_id),
+    CONSTRAINT chatbot_conversations_user_id_foreign FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE = InnoDB;
+
+-- 9. CHATBOT_MESSAGES (Messages de chaque discussion)
+CREATE TABLE chatbot_messages (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    chatbot_conversation_id BIGINT UNSIGNED NOT NULL,
+    role VARCHAR(20) NOT NULL COMMENT 'user ou bot',
+    content LONGTEXT NOT NULL,
+    chart_data JSON NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    CONSTRAINT chatbot_messages_conversation_foreign FOREIGN KEY (chatbot_conversation_id) REFERENCES chatbot_conversations (id) ON DELETE CASCADE
+) ENGINE = InnoDB;
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- 10. PATCH MIGRATIONS POUR BASES EXISTANTES
+-- Exécuter si la table 'users' existe déjà sans ces colonnes :
+-- ═════════════════════════════════════════════════════════════════════════════
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_code VARCHAR(6) NULL AFTER email_verified_at;
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_expires_at TIMESTAMP NULL AFTER email_verification_code;
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_enabled TINYINT(1) NOT NULL DEFAULT 0 AFTER remember_token;
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_secret TEXT NULL AFTER two_factor_enabled;
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_code VARCHAR(6) NULL AFTER two_factor_secret;
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_expires_at TIMESTAMP NULL AFTER two_factor_code;
+
+

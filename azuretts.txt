@@ -1,0 +1,11 @@
+Cliquez sur "Speech" (Microsoft Azure Service) — le premier carré sans prix indiqué
+Cliquez sur "Créer"
+Remplissez le formulaire :
+Abonnement : votre abonnement
+Groupe de ressources : créer un nouveau → heatAlert-rg
+Région : choisir East US (important, même région que dans .env)
+Nom : heatAlert-speech
+Niveau tarifaire : Free F0 ← sélectionner absolument ce niveau (gratuit)
+Cliquez "Vérifier + créer" puis "Créer"
+Après déploiement → aller dans la ressource → "Clés et point de terminaison"
+Copier Clé 1 et la mettre dans votre .env :

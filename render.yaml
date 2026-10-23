@@ -1,0 +1,53 @@
+services:
+  - type: web
+    name: heatalert-web
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: frankfurt # ou oregon, ohio, singapore
+    envVars:
+      - key: APP_NAME
+        value: HeatAlert
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_URL
+        sync: false
+      - key: APP_KEY
+        generateValue: true
+      - key: RUN_MIGRATIONS
+        value: "true"
+      # Base de données MySQL (Aiven, PlanetScale, Clever Cloud ou Render)
+      - key: DB_CONNECTION
+        value: mysql
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_DATABASE
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      # Drivers Laravel
+      - key: SESSION_DRIVER
+        value: cookie
+      - key: CACHE_STORE
+        value: file
+      - key: QUEUE_CONNECTION
+        value: sync
+      # Clés API externes
+      - key: NASA_FIRMS_MAP_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: AZURE_TTS_KEY
+        sync: false
+      - key: AZURE_TTS_REGION
+        value: eastus

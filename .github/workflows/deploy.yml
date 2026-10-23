@@ -1,0 +1,153 @@
+name: CI/CD Pipeline - Build & Deploy to Render
+
+on:
+  push:
+    branches:
+      - main
+      - aziz
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  # ============================================================================
+  # JOB 1: Test & Lint (Continuous Integration)
+  # ============================================================================
+  ci:
+    name: Run Tests & Build Assets
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, bcmath, gd, zip
+          coverage: none
+
+      - name: Validate composer.json & composer.lock
+        run: composer validate --strict
+
+      - name: Cache Composer Dependencies
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      - name: Install Composer Dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install NPM Dependencies & Build Assets
+        run: |
+          npm ci || npm install
+          npm run build
+
+      - name: Check PHP Syntax (Lint)
+        run: |
+          find app routes config -name "*.php" -exec php -l {} \; > /dev/null
+          echo "All PHP files have valid syntax!"
+
+  # ============================================================================
+  # JOB 2: Unit & Feature Tests (PHPUnit)
+  # ============================================================================
+  test:
+    name: Run Unit & Feature Tests
+    runs-on: ubuntu-latest
+    needs: ci
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_sqlite, bcmath, gd, zip
+          coverage: none
+
+      - name: Cache Composer Dependencies
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      - name: Install Composer Dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Prepare Laravel Environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Configure SQLite for Testing
+        run: |
+          touch database/database.sqlite
+          echo "DB_CONNECTION=sqlite" >> .env
+          echo "DB_DATABASE=$(pwd)/database/database.sqlite" >> .env
+
+      - name: Run Database Migrations
+        run: php artisan migrate --force
+
+      - name: Run Unit Tests
+        run: php artisan test --testsuite=Unit --stop-on-failure
+
+      - name: Run Feature Tests
+        run: php artisan test --testsuite=Feature --stop-on-failure
+
+  # ============================================================================
+  # JOB 3: Deploy to Render (Continuous Deployment)
+  # ============================================================================
+  deploy:
+    name: Deploy to Render
+    needs: [ci, test]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Render Deploy Hook
+        env:
+          DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$DEPLOY_HOOK_URL" ]; then
+            echo "::error::Secret 'RENDER_DEPLOY_HOOK_URL' is missing!"
+            echo "-----------------------------------------------------------------------------"
+            echo "HOW TO FIX:"
+            echo "1. Go to your Render Dashboard (https://dashboard.render.com)."
+            echo "2. Open your Web Service -> Go to 'Settings' tab."
+            echo "3. Scroll down to 'Deploy Hook' and click 'Create Deploy Hook' or copy the URL."
+            echo "4. In your GitHub repository: Go to Settings -> Secrets and variables -> Actions."
+            echo "5. Click 'New repository secret', Name: RENDER_DEPLOY_HOOK_URL, Value: <your hook URL>."
+            echo "-----------------------------------------------------------------------------"
+            exit 1
+          fi
+
+          echo "Triggering Render deployment via Webhook..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$DEPLOY_HOOK_URL")
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "Response from Render: $BODY"
+
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            echo "✅ Deployment successfully triggered on Render! (HTTP $HTTP_STATUS)"
+          else
+            echo "::error::Render deployment hook failed with status $HTTP_STATUS"
+            exit 1
+          fi

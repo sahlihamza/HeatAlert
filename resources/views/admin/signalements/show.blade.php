@@ -50,6 +50,29 @@
   </div>
 </div>
 
+@php
+  $analysisTone = match($anomalyAnalysis['level']) {
+    'high' => 'danger', 'medium' => 'warning', 'unavailable' => 'secondary', default => 'success',
+  };
+  $analysisBadgeClass = $analysisTone === 'warning' ? 'bg-warning text-dark' : 'bg-' . $analysisTone;
+@endphp
+<section class="m-card mb-4 border-start border-4 border-{{ $analysisTone }}">
+  <div class="m-card__header d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <h2 class="m-card__title"><i class="fa-solid fa-shield-halved me-2 text-primary"></i>Analyse automatique des anomalies</h2>
+    <span class="badge {{ $analysisBadgeClass }}">
+      @if($anomalyAnalysis['score'] !== null)Score {{ $anomalyAnalysis['score'] }}/100 · @endif{{ $anomalyAnalysis['label'] }}
+    </span>
+  </div>
+  <div class="p-3">
+    <ul class="mb-2">
+      @foreach($anomalyAnalysis['reasons'] as $reason)
+        <li>{{ $reason }}</li>
+      @endforeach
+    </ul>
+    <p class="small text-muted mb-0">Ce score aide à prioriser la modération. Il ne confirme pas qu’un signalement est faux et ne remplace pas la vérification de l’administrateur.</p>
+  </div>
+</section>
+
 <div class="row g-4">
   <div class="col-lg-7">
     <section class="m-card">

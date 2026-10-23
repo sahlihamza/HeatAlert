@@ -29,7 +29,7 @@
           <select id="type" name="type" class="form-select @error('type') is-invalid @enderror" required>
             <option value="">Sélectionner un type</option>
             @foreach($types as $type)
-              <option value="{{ $type }}" {{ old('type', $coupure->type ?? '') === $type ? 'selected' : '' }}>
+              <option value="{{ $type }}" {{ old('type', $coupure->type ?? request('type', '')) === $type ? 'selected' : '' }}>
                 {{ ucfirst($type) }}
               </option>
             @endforeach
@@ -45,7 +45,7 @@
               <option value="terminee" selected>Terminée (automatique)</option>
             @else
               @foreach($statuts as $statut)
-                <option value="{{ $statut }}" {{ old('statut', $coupure->statut ?? 'prevue') === $statut ? 'selected' : '' }}>
+                <option value="{{ $statut }}" {{ old('statut', $coupure->statut ?? request('statut', 'prevue')) === $statut ? 'selected' : '' }}>
                   {{ ucfirst(str_replace('_', ' ', $statut)) }}
                 </option>
               @endforeach
@@ -61,7 +61,7 @@
           <select id="zone_id" name="zone_id" class="form-select @error('zone_id') is-invalid @enderror" required>
             <option value="">Sélectionner une zone</option>
             @foreach($zones as $zone)
-              <option value="{{ $zone->id }}" {{ old('zone_id', $coupure->zone_id ?? '') == $zone->id ? 'selected' : '' }}>
+              <option value="{{ $zone->id }}" {{ old('zone_id', $coupure->zone_id ?? request('zone_id', '')) == $zone->id ? 'selected' : '' }}>
                 {{ $zone->nom }} — {{ $zone->ville }} ({{ $zone->gouvernorat }})
               </option>
             @endforeach
@@ -74,7 +74,7 @@
           <label for="date_debut" class="form-label fw-semibold">Date de début <span class="text-danger">*</span></label>
           <input type="datetime-local" id="date_debut" name="date_debut"
                  class="form-control @error('date_debut') is-invalid @enderror"
-                 value="{{ old('date_debut', isset($coupure->date_debut) ? $coupure->date_debut->format('Y-m-d\TH:i') : '') }}"
+                 value="{{ old('date_debut', isset($coupure->date_debut) ? $coupure->date_debut->format('Y-m-d\TH:i') : request('date_debut', '')) }}"
                  step="60" required>
           <div class="invalid-feedback" id="date_debut-error">@error('date_debut'){{ $message }}@else{{ 'La date de début est obligatoire.' }}@enderror</div>
           <small class="form-text text-muted">Choisissez la date, l’heure et les minutes exactes.</small>
@@ -85,8 +85,8 @@
           <label for="date_fin" class="form-label fw-semibold">Date de fin</label>
           <input type="datetime-local" id="date_fin" name="date_fin"
                  class="form-control @error('date_fin') is-invalid @enderror"
-                 value="{{ old('date_fin', isset($coupure->date_fin) ? $coupure->date_fin->format('Y-m-d\TH:i') : '') }}"
-                 step="60" {{ empty(old('date_debut', isset($coupure->date_debut) ? $coupure->date_debut->format('Y-m-d\TH:i') : '')) ? 'disabled' : '' }}>
+                 value="{{ old('date_fin', isset($coupure->date_fin) ? $coupure->date_fin->format('Y-m-d\TH:i') : request('date_fin', '')) }}"
+                 step="60" {{ empty(old('date_debut', isset($coupure->date_debut) ? $coupure->date_debut->format('Y-m-d\TH:i') : request('date_debut', ''))) ? 'disabled' : '' }}>
           <div class="invalid-feedback" id="date_fin-error">@error('date_fin'){{ $message }}@else{{ 'La date de fin doit être postérieure à la date de début.' }}@enderror</div>
           <small class="form-text text-muted">La fin doit être ultérieure au début.</small>
         </div>
@@ -99,7 +99,7 @@
           </div>
           <textarea id="cause" name="cause" rows="4" maxlength="500"
                     class="form-control @error('cause') is-invalid @enderror"
-                    placeholder="Décrire la cause détaillée de la coupure électrique..." required>{{ old('cause', $coupure->cause ?? '') }}</textarea>
+                    placeholder="Décrire la cause détaillée de la coupure électrique..." required>{{ old('cause', $coupure->cause ?? request('cause', '')) }}</textarea>
           <div class="invalid-feedback" id="cause-error">@error('cause'){{ $message }}@else{{ 'La cause de la coupure est obligatoire (au moins 3 caractères).' }}@enderror</div>
         </div>
       </div>

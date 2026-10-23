@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\SignalementCoupure;
 use App\Models\Zone;
+use App\Services\SignalementAnomalyService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -14,7 +15,7 @@ class SignalementCoupureController extends Controller
     /**
      * Liste paginée des signalements avec leurs relations.
      */
-    public function index(Request $request): View
+    public function index(Request $request, SignalementAnomalyService $anomalyService): View
     {
         $query = SignalementCoupure::with(['user', 'coupure.zone'])
             ->orderByRaw("FIELD(statut_validation, 'en_attente', 'valide', 'rejete')")
@@ -46,6 +47,11 @@ class SignalementCoupureController extends Controller
         }
 
         $signalements = $query->paginate(10)->withQueryString();
+        $signalements->getCollection()->transform(function (SignalementCoupure $signalement) use ($anomalyService) {
+            $signalement->anomaly_analysis = $anomalyService->analyze($signalement);
+
+            return $signalement;
+        });
         $zones = Zone::query()->orderBy('gouvernorat')->orderBy('nom')->get();
 
         return view('admin.signalements.index', compact('signalements', 'zones'));
@@ -54,11 +60,12 @@ class SignalementCoupureController extends Controller
     /**
      * Affiche le détail d'un signalement.
      */
-    public function show(SignalementCoupure $signalement): View
+    public function show(SignalementCoupure $signalement, SignalementAnomalyService $anomalyService): View
     {
         $signalement->load(['user', 'coupure.zone']);
+        $anomalyAnalysis = $anomalyService->analyze($signalement);
 
-        return view('admin.signalements.show', compact('signalement'));
+        return view('admin.signalements.show', compact('signalement', 'anomalyAnalysis'));
     }
 
     /**

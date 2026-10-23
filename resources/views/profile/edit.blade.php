@@ -67,6 +67,32 @@
       </div>
     @endif
 
+    @if(session('status') === '2fa-enabled')
+      <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm rounded-4 d-flex align-items-center gap-3 p-3 mb-4" role="alert" style="background: #ecfdf5; border-left: 5px solid #10b981 !important;">
+        <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 42px; height: 42px; background: #10b981; color: white;">
+          <i class="bi bi-shield-lock-fill fs-5"></i>
+        </div>
+        <div class="flex-grow-1">
+          <h6 class="fw-bold mb-0 text-success">Authentification à deux facteurs activée !</h6>
+          <small class="text-muted">Votre compte est maintenant protégé par la 2FA. Conservez vos codes de sauvegarde.</small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></button>
+      </div>
+    @endif
+
+    @if(session('status') === '2fa-disabled')
+      <div class="alert alert-warning alert-dismissible fade show border-0 shadow-sm rounded-4 d-flex align-items-center gap-3 p-3 mb-4" role="alert" style="background: #fffbeb; border-left: 5px solid #f59e0b !important;">
+        <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 42px; height: 42px; background: #f59e0b; color: white;">
+          <i class="bi bi-shield-exclamation fs-5"></i>
+        </div>
+        <div class="flex-grow-1">
+          <h6 class="fw-bold mb-0" style="color:#92400e;">Authentification à deux facteurs désactivée</h6>
+          <small class="text-muted">La 2FA a été retirée de votre compte. Vous pouvez la réactiver à tout moment.</small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></button>
+      </div>
+    @endif
+
     {{-- ── 1. BANNIÈRE PROFIL / USER SPOTLIGHT CARD ── --}}
     <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4 bg-white">
       <div class="p-4 p-md-5" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); position: relative;">
@@ -148,6 +174,9 @@
                 <i class="bi bi-key-fill"></i>
                 <span>Sécurité</span>
               </button>
+              <a href="{{ route('front.equipements_sensibles.index') }}" class="btn btn-danger px-3 py-2 rounded-pill fw-semibold d-inline-flex align-items-center gap-2">
+                <i class="bi bi-shield-heart"></i><span>Ma préparation</span>
+              </a>
             </div>
           </div>
         </div>
@@ -746,6 +775,150 @@
                 </div>
               </form>
 
+              {{-- ═══════════════════════════════════
+                   SECTION 2FA — TOTP (QR CODE)
+              ═══════════════════════════════════ --}}
+              <div class="mt-5 pt-4 border-top">
+                <div class="d-flex align-items-center gap-3 mb-4">
+                  <div class="rounded-3 p-2 bg-dark bg-opacity-10 text-dark">
+                    <i class="bi bi-qr-code fs-4"></i>
+                  </div>
+                  <div>
+                    <h5 class="fw-bold mb-0 text-dark">Authentification à deux facteurs (2FA)</h5>
+                    <small class="text-muted">Renforcez la sécurité de votre compte avec une application TOTP</small>
+                  </div>
+                  @if($user->two_factor_enabled)
+                    <span class="ms-auto badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill fw-semibold">
+                      <i class="bi bi-shield-fill-check me-1"></i>Activée
+                    </span>
+                  @else
+                    <span class="ms-auto badge bg-secondary-subtle text-secondary border border-secondary-subtle px-3 py-2 rounded-pill fw-semibold">
+                      <i class="bi bi-shield me-1"></i>Désactivée
+                    </span>
+                  @endif
+                </div>
+
+                @if($user->two_factor_enabled)
+                  {{-- 2FA ACTIVE : afficher options de désactivation --}}
+                  <div class="p-4 rounded-4 mb-4" style="background: linear-gradient(135deg,#ecfdf5,#d1fae5); border: 1px solid #6ee7b7;">
+                    <div class="d-flex align-items-start gap-3">
+                      <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:48px;height:48px;background:#10b981;color:#fff;font-size:1.4rem;">🛡️</div>
+                      <div>
+                        <h6 class="fw-bold text-dark mb-1">Votre compte est protégé par la 2FA</h6>
+                        <p class="text-muted small mb-0">
+                          À chaque connexion, vous devrez saisir un code à 6 chiffres généré par votre application d'authentification (Google Authenticator, Authy, etc.).
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="d-flex flex-wrap gap-3 align-items-center p-3 rounded-3 bg-light border">
+                    <div class="d-flex align-items-center gap-2 small text-muted">
+                      <i class="bi bi-phone text-primary fs-5"></i>
+                      <span>Lié à votre application TOTP</span>
+                    </div>
+                    <button type="button" class="ms-auto btn btn-outline-danger rounded-pill px-4 fw-semibold"
+                            data-bs-toggle="modal" data-bs-target="#disable2FAModal">
+                      <i class="bi bi-shield-x me-1"></i>Désactiver la 2FA
+                    </button>
+                  </div>
+
+                @else
+                  {{-- 2FA INACTIVE : bouton pour afficher le QR Code --}}
+                  <div class="p-4 rounded-4 mb-4" style="background: linear-gradient(135deg,#eff6ff,#dbeafe); border: 1px solid #93c5fd;">
+                    <div class="d-flex align-items-start gap-3">
+                      <div style="font-size:2rem;flex-shrink:0;">📱</div>
+                      <div>
+                        <h6 class="fw-bold text-dark mb-1">Activez la 2FA pour sécuriser votre compte</h6>
+                        <p class="text-muted small mb-2">
+                          Scannez un QR Code avec <strong>Google Authenticator</strong>, <strong>Authy</strong> ou toute autre application TOTP. Aucun numéro de téléphone requis.
+                        </p>
+                        <div class="d-flex flex-wrap gap-2">
+                          <span class="badge bg-white border text-dark small"><i class="bi bi-check-circle-fill text-success me-1"></i>100% gratuit</span>
+                          <span class="badge bg-white border text-dark small"><i class="bi bi-check-circle-fill text-success me-1"></i>Fonctionne hors-ligne</span>
+                          <span class="badge bg-white border text-dark small"><i class="bi bi-check-circle-fill text-success me-1"></i>Code valide 30 secondes</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button type="button" class="btn btn-dark rounded-pill px-5 py-2 fw-semibold d-inline-flex align-items-center gap-2"
+                          id="btn-setup-2fa">
+                    <i class="bi bi-qr-code"></i> Configurer la 2FA avec QR Code
+                  </button>
+
+                  {{-- Zone QR Code (cachée par défaut) --}}
+                  <div id="qr-setup-zone" style="display:none;" class="mt-4">
+                    <div class="card border-0 shadow-sm rounded-4 p-4" style="background:#f8fafc;">
+
+                      <div class="d-flex align-items-center gap-2 mb-3">
+                        <div class="rounded-3 p-1 bg-dark text-white" style="font-size:.9rem;padding:6px 10px!important;">Étape 1</div>
+                        <span class="fw-bold text-dark small">Scannez ce QR Code avec votre application</span>
+                      </div>
+
+                      {{-- QR Code SVG généré dynamiquement --}}
+                      <div class="text-center mb-3">
+                        <div id="qr-loading" class="py-4">
+                          <div class="spinner-border text-dark" role="status"></div>
+                          <p class="text-muted small mt-2">Génération du QR Code…</p>
+                        </div>
+                        <div id="qr-svg-container" style="display:none;">
+                          <div class="d-inline-block p-3 bg-white rounded-3 shadow-sm border" id="qr-svg-wrap"></div>
+                          <div class="mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill" id="btn-show-secret">
+                              <i class="bi bi-key me-1"></i>Afficher la clé manuelle
+                            </button>
+                          </div>
+                          <div id="secret-zone" style="display:none;" class="mt-2">
+                            <div class="p-2 rounded bg-light border d-inline-block">
+                              <code id="secret-text" style="font-size:.85rem;letter-spacing:2px;"></code>
+                            </div>
+                            <p class="text-muted" style="font-size:11px;">Saisie manuelle si le scan ne fonctionne pas.</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="d-flex align-items-center gap-2 mb-3">
+                        <div class="rounded-3 p-1 bg-dark text-white" style="font-size:.9rem;padding:6px 10px!important;">Étape 2</div>
+                        <span class="fw-bold text-dark small">Confirmez avec le code affiché dans l'application</span>
+                      </div>
+
+                      <form method="POST" action="{{ route('2fa.enable') }}" id="enable-2fa-form">
+                        @csrf
+                        <div class="mb-3">
+                          <div class="d-flex gap-2 justify-content-center" id="totp-digits">
+                            @for($d = 0; $d < 6; $d++)
+                              <input type="text"
+                                     class="form-control text-center fw-bold fs-4 totp-digit-input"
+                                     maxlength="1" inputmode="numeric" pattern="[0-9]"
+                                     id="td-{{ $d }}"
+                                     autocomplete="off"
+                                     style="width:52px;height:60px;border-radius:12px;border:2px solid #e2e8f0;">
+                            @endfor
+                          </div>
+                          <input type="hidden" name="totp_code" id="totp-hidden">
+                          @error('totp_code')
+                            <div class="text-danger small mt-2 text-center">{{ $message }}</div>
+                          @enderror
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2">
+                          <button type="button" class="btn btn-light border rounded-pill px-4" id="btn-cancel-2fa">
+                            Annuler
+                          </button>
+                          <button type="submit" class="btn btn-dark rounded-pill px-5 fw-semibold d-inline-flex align-items-center gap-2"
+                                  id="btn-confirm-2fa" disabled>
+                            <i class="bi bi-shield-lock-fill"></i> Activer la 2FA
+                          </button>
+                        </div>
+                      </form>
+
+                    </div>
+                  </div>
+                @endif
+              </div>
+              {{-- FIN SECTION 2FA --}}
+
             </div>
           </div>
         </div>
@@ -833,6 +1006,50 @@
         <div class="modal-footer border-0 pt-0 bg-light rounded-bottom-4">
           <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Annuler</button>
           <button type="submit" class="btn btn-danger rounded-pill px-4">Supprimer définitivement</button>
+        </div>
+      </form>
+    </div>
+</div>
+
+{{-- ── MODAL DÉSACTIVATION 2FA ── --}}
+<div class="modal fade" id="disable2FAModal" tabindex="-1" aria-labelledby="disable2FAModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4 border-0 shadow-lg">
+      <form method="POST" action="{{ route('2fa.disable') }}">
+        @csrf
+
+        <div class="modal-header border-0 pb-0">
+          <div class="rounded-circle bg-warning bg-opacity-10 text-warning p-3 d-inline-flex">
+            <i class="bi bi-shield-x fs-3"></i>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+        </div>
+
+        <div class="modal-body pt-3 pb-4">
+          <h5 class="fw-bold text-dark mb-2" id="disable2FAModalLabel">Désactiver l'authentification 2FA ?</h5>
+          <p class="text-muted small mb-3">
+            Votre compte ne sera plus protégé par le second facteur TOTP. Pour confirmer la désactivation, veuillez saisir votre mot de passe actuel.
+          </p>
+
+          <div class="mb-3">
+            <label for="disable_2fa_password" class="form-label small fw-bold text-dark">Votre mot de passe actuel</label>
+            <input type="password"
+                   class="form-control @error('password', 'disable2fa') is-invalid @enderror"
+                   id="disable_2fa_password"
+                   name="password"
+                   required
+                   placeholder="Mot de passe actuel">
+            @error('password', 'disable2fa')
+              <div class="text-danger small mt-1">{{ $message }}</div>
+            @enderror
+          </div>
+        </div>
+
+        <div class="modal-footer border-0 pt-0 bg-light rounded-bottom-4">
+          <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Annuler</button>
+          <button type="submit" class="btn btn-danger rounded-pill px-4 fw-semibold">
+            <i class="bi bi-shield-x me-1"></i> Désactiver la 2FA
+          </button>
         </div>
       </form>
     </div>
@@ -958,8 +1175,15 @@ function checkPasswordStrength(password) {
  * Sélection automatique de l'onglet selon erreurs de validation ou hash URL
  */
 document.addEventListener('DOMContentLoaded', function() {
-  @if ($errors->updatePassword->any() || session('status') === 'password-updated')
+  @if ($errors->updatePassword->any() || session('status') === 'password-updated' || session('status') === '2fa-enabled' || session('status') === '2fa-disabled' || session('2fa_error') || $errors->has('totp_code') || session('open_2fa_setup'))
     switchProfileTab('security-tab');
+  @elseif ($errors->disable2fa->any())
+    switchProfileTab('security-tab');
+    const disableModalEl = document.getElementById('disable2FAModal');
+    if (disableModalEl) {
+      const disableModal = new bootstrap.Modal(disableModalEl);
+      disableModal.show();
+    }
   @elseif ($errors->userDeletion->any())
     const modalEl = document.getElementById('confirmUserDeletionModal');
     if (modalEl) {
@@ -975,6 +1199,96 @@ document.addEventListener('DOMContentLoaded', function() {
       switchProfileTab('edit-tab');
     } else if (hash === '#security') {
       switchProfileTab('security-tab');
+    }
+  @endif
+
+  // ── 2FA QR Code Setup ──────────────────────────────────────────
+  const btnSetup2fa   = document.getElementById('btn-setup-2fa');
+  const qrSetupZone   = document.getElementById('qr-setup-zone');
+  const qrLoading     = document.getElementById('qr-loading');
+  const qrSvgCont     = document.getElementById('qr-svg-container');
+  const qrSvgWrap     = document.getElementById('qr-svg-wrap');
+  const btnShowSecret = document.getElementById('btn-show-secret');
+  const secretZone    = document.getElementById('secret-zone');
+  const secretText    = document.getElementById('secret-text');
+  const btnCancel2fa  = document.getElementById('btn-cancel-2fa');
+  const totpDigits    = Array.from(document.querySelectorAll('.totp-digit-input'));
+  const totpHidden    = document.getElementById('totp-hidden');
+  const btnConfirm    = document.getElementById('btn-confirm-2fa');
+
+  if (btnSetup2fa) {
+    btnSetup2fa.addEventListener('click', function() {
+      qrSetupZone.style.display = 'block';
+      btnSetup2fa.style.display = 'none';
+      qrLoading.style.display = 'block';
+      qrSvgCont.style.display = 'none';
+
+      fetch('{{ route("2fa.setup") }}', {
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]') ?
+            document.querySelector('meta[name="csrf-token"]').content :
+            '{{ csrf_token() }}' }
+      })
+      .then(r => r.json())
+      .then(data => {
+        qrLoading.style.display = 'none';
+        qrSvgWrap.innerHTML = data.qr_svg;
+        if (secretText) secretText.textContent = data.secret;
+        qrSvgCont.style.display = 'block';
+        // auto-scroll
+        qrSetupZone.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (totpDigits[0]) totpDigits[0].focus();
+      })
+      .catch(() => {
+        qrLoading.innerHTML = '<p class="text-danger small">Erreur de chargement. Veuillez réessayer.</p>';
+      });
+    });
+  }
+
+  if (btnShowSecret) {
+    btnShowSecret.addEventListener('click', () => {
+      secretZone.style.display = secretZone.style.display === 'none' ? 'block' : 'none';
+    });
+  }
+
+  if (btnCancel2fa) {
+    btnCancel2fa.addEventListener('click', () => {
+      qrSetupZone.style.display = 'none';
+      if (btnSetup2fa) btnSetup2fa.style.display = 'inline-flex';
+      totpDigits.forEach(d => d.value = '');
+      if (totpHidden) totpHidden.value = '';
+      if (btnConfirm) btnConfirm.disabled = true;
+    });
+  }
+
+  // OTP digit navigation for TOTP setup form
+  function updateTotpHidden() {
+    const code = totpDigits.map(d => d.value).join('');
+    if (totpHidden) totpHidden.value = code;
+    if (btnConfirm) btnConfirm.disabled = code.length !== 6;
+  }
+  totpDigits.forEach((d, i) => {
+    d.addEventListener('keydown', e => {
+      if (e.key === 'Backspace' && !d.value && i > 0) { totpDigits[i-1].focus(); totpDigits[i-1].select(); }
+    });
+    d.addEventListener('input', () => {
+      d.value = d.value.replace(/\D/g, '').slice(-1);
+      updateTotpHidden();
+      if (d.value && i < 5) totpDigits[i+1].focus();
+    });
+    d.addEventListener('paste', e => {
+      e.preventDefault();
+      const p = (e.clipboardData||window.clipboardData).getData('text').replace(/\D/g,'').slice(0,6);
+      p.split('').forEach((c,j)=>{ if(totpDigits[j]) totpDigits[j].value=c; });
+      updateTotpHidden();
+      totpDigits[Math.min(p.length,5)].focus();
+    });
+  });
+
+  // Si erreur totp_code, ré-afficher la zone de setup
+  @if($errors->has('totp_code') || session('open_2fa_setup'))
+    if (btnSetup2fa && qrSetupZone) {
+      btnSetup2fa.click();
     }
   @endif
 });

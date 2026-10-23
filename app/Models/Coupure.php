@@ -22,6 +22,8 @@ class Coupure extends Model
         'date_fin',
         'cause',
         'zone_id',
+        'steg_ref',  // Référence unique STEG (RSS/HTML/DEMO hash) pour déduplications
+        'origin',    // Origine : manual | steg_rss | steg_html | steg_demo
     ];
 
     protected $casts = [

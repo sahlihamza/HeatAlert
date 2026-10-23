@@ -11,3 +11,22 @@ php artisan migrate
 php artisan migrate --seed
 
 php artisan serve
+
+---
+Pour lancer l'automatisation Cron (Vérification des prédictions toutes les 6h et sync STEG toutes les 2h) :
+Ouvre un terminal dédié et lance :
+php artisan schedule:work
+
+---
+Pour activer et lancer le Microservice de Machine Learning (FastAPI & Modèle IA) :
+1. Ouvre un terminal dédié et va dans le dossier ml-service :
+   cd ml-service
+2. Crée et active l'environnement virtuel Python (si pas encore fait) :
+   python -m venv .venv
+   .venv\Scripts\activate
+3. Installe les dépendances requises :
+   pip install -r requirements.txt
+4. (Optionnel) Pour réentraîner le modèle sur les dernières données :
+   python train.py --artifacts-dir artifacts/latest
+5. Lance le serveur de prédiction FastAPI sur le port 8001 :
+   uvicorn app.main:app --port 8001 --reload

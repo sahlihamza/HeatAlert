@@ -64,3 +64,74 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+---
+
+## ⚡ HeatAlert — Automatisation des Tâches Planifiées (Cron)
+
+Le projet intègre des tâches planifiées autonomes 24/7 configurées dans `routes/console.php` :
+1. **Prédictions de Coupures ML (`predictions:auto-check`)** : Analyse automatique de toutes les zones toutes les 6 heures avec alertes résidents et création de délestages préventifs si le risque > 70%.
+2. **Synchronisation STEG (`steg:sync-coupures`)** : Importation et matching des avis de coupures officielles de la STEG toutes les 2 heures.
+
+### 🚀 Lancement du Planificateur en Local (Développement)
+Pour exécuter automatiquement les tâches planifiées pendant que votre application tourne :
+```bash
+php artisan schedule:work
+```
+
+### ⚙️ Déploiement en Production (Serveur Linux)
+Ajoutez une seule entrée dans le `crontab` du serveur pour réveiller le planificateur chaque minute :
+```bash
+* * * * * cd /chemin-du-projet && php artisan schedule:run >> /dev/null 2>&1
+```
+
+### 🧪 Exécution Manuelle Immédiate
+```bash
+# Vérifier et notifier les zones critiques sans attendre 6h :
+php artisan predictions:auto-check --threshold=0.70 --notify --auto-draft
+
+# Forcer la synchronisation officielle STEG :
+php artisan steg:sync-coupures --fresh
+```
+
+---
+
+## 🤖 Microservice Machine Learning (Prédiction des Coupures & FastAPI)
+
+Le microservice d'intelligence artificielle est situé dans le dossier `ml-service/`. Il expose une API REST haute performance basée sur **FastAPI** et un modèle calibré **Scikit-Learn** (`artifacts/latest/heatalert_model.joblib`).
+
+### 📦 Installation et Lancement du Microservice ML
+
+1. **Ouvrir un terminal et naviguer vers le dossier du service :**
+   ```bash
+   cd ml-service
+   ```
+
+2. **Créer et activer l'environnement virtuel Python :**
+   ```bash
+   # Sous Windows PowerShell / CMD :
+   python -m venv .venv
+   .venv\Scripts\activate
+
+   # Sous Linux / macOS :
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+3. **Installer les dépendances :**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **(Optionnel) Réentraîner le modèle sur les données fraîches :**
+   ```bash
+   python train.py --artifacts-dir artifacts/latest
+   ```
+   *Cette commande applique le nettoyage, l'imputation médiane, la standardisation, le split chronologique et calibre le modèle avec génération du rapport d'évaluation `training_report.json`.*
+
+5. **Lancer le serveur d'inférence FastAPI :**
+   ```bash
+   uvicorn app.main:app --port 8001 --reload
+   ```
+   *L'API sera accessible sur `http://127.0.0.1:8001` (Documentation interactive Swagger sur `http://127.0.0.1:8001/docs`).*
+

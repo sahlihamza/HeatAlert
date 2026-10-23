@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\AlerteMeteo;
+use App\Models\User;
+use App\Notifications\HighLevelWeatherAlertNotification;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 /**
@@ -25,7 +27,9 @@ class AlerteMeteoService
      */
     public function create(array $data): AlerteMeteo
     {
-        return AlerteMeteo::create($data);
+        $alerte = AlerteMeteo::create($data);
+        $this->notifyIfHighLevel($alerte);
+        return $alerte;
     }
 
     /**
@@ -33,7 +37,11 @@ class AlerteMeteoService
      */
     public function update(AlerteMeteo $alerte, array $data): bool
     {
-        return $alerte->update($data);
+        $updated = $alerte->update($data);
+        if ($updated) {
+            $this->notifyIfHighLevel($alerte);
+        }
+        return $updated;
     }
 
     /**
@@ -42,5 +50,13 @@ class AlerteMeteoService
     public function delete(AlerteMeteo $alerte): bool
     {
         return $alerte->delete();
+    }
+
+    private function notifyIfHighLevel(AlerteMeteo $alerte): void
+    {
+        if ($alerte->statut === 'active' && in_array($alerte->niveau, ['orange', 'rouge'], true)) {
+            User::where('role', User::ROLE_USER)->get()
+                ->each(fn (User $user) => $user->notify(new HighLevelWeatherAlertNotification($alerte)));
+        }
     }
 }

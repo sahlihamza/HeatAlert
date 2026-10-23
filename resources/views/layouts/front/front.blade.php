@@ -4,6 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>Index - HeatAlert</title>
   <meta name="description" content="">
   <meta name="keywords" content="">
@@ -776,6 +777,18 @@
   <script src={{ asset("assets/front/js/main.js") }}></script>
 
   @stack('scripts')
+
+  <style>
+    /* Évite le chevauchement avec la bulle de chatbot HeatBot */
+    .scroll-top {
+      bottom: 105px !important;
+      right: 28px !important;
+      z-index: 9999 !important;
+    }
+  </style>
+
+  <!-- Widget Chatbot IA HeatAlert (Gemini Flash + Dynamic Data + Charts) -->
+  @include('layouts.front.components.chatbot')
 
 </body>
 

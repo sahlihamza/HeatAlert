@@ -132,6 +132,8 @@
 
         { section: 'Alertes Météo', title: 'Liste des alertes', sub: 'Gérer les alertes de vigilance canicule', href: "{{ route('admin.alertes.index') }}", icon: 'fa-triangle-exclamation' },
         { section: 'Alertes Météo', title: 'Créer une alerte', sub: 'Publier une nouvelle alerte météo', href: "{{ route('admin.alertes.create') }}", icon: 'fa-plus' },
+        { section: 'Équipements sensibles', title: 'Liste des équipements', sub: 'Gérer les équipements sensibles', href: "{{ route('admin.equipements-sensibles.index') }}", icon: 'fa-shield-heart' },
+        { section: 'Équipements sensibles', title: 'Ajouter un équipement', sub: 'Référencer un site sensible', href: "{{ route('admin.equipements-sensibles.create') }}", icon: 'fa-plus' },
 
         { section: 'Coupures électriques', title: 'Signalements', sub: 'Modérer les signalements de coupures', href: "{{ route('admin.signalements.index') }}", icon: 'fa-flag' },
 
@@ -235,5 +237,6 @@
     </script>
 
     @stack('scripts')
+
   </body>
 </html>

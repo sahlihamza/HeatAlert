@@ -1,0 +1,6 @@
+@extends('layouts.front.front')
+@section('title', 'Mes notifications')
+@section('content')
+<section class="container py-5"><div class="d-flex justify-content-between align-items-center mb-4"><h1><i class="bi bi-bell-fill text-danger me-2"></i>Mes notifications</h1><form method="POST" action="{{ route('front.notifications.read_all') }}">@csrf @method('PATCH')<button class="btn btn-outline-secondary">Tout marquer comme lu</button></form></div>
+@forelse($notifications as $notification)<div class="card mb-3 {{ $notification->read_at ? '' : 'border-danger' }}"><div class="card-body d-flex justify-content-between gap-3"><div><h5 class="mb-1">{{ $notification->data['title'] ?? 'Notification' }}</h5><p class="mb-1">{{ $notification->data['message'] ?? '' }}</p><small class="text-muted">{{ $notification->created_at->diffForHumans() }}</small></div>@if(!$notification->read_at)<form method="POST" action="{{ route('front.notifications.read', $notification->id) }}">@csrf @method('PATCH')<button class="btn btn-sm btn-outline-danger">Marquer comme lue</button></form>@endif</div></div>@empty<div class="alert alert-info">Vous n'avez aucune notification.</div>@endforelse{{ $notifications->links() }}</section>
+@endsection

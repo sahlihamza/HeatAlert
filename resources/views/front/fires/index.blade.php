@@ -123,6 +123,11 @@
         </div>
 
         <div class="col-md-6 d-flex justify-content-md-end align-items-center gap-2 flex-wrap">
+          <!-- Bouton Prédire la Propagation ML (LightGBM) -->
+          <button type="button" class="btn btn-sm btn-warning text-dark rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-2 shadow-sm" id="btnPredictSpread" onclick="runFireSpreadPrediction()" title="Prédire la propagation du feu dans les 24h avec le modèle LightGBM">
+            <i class="bi bi-cpu-fill text-danger fs-6"></i>
+            <span>Prédire la Propagation (ML 24h)</span>
+          </button>
           <!-- Bouton Impression Pro -->
           <button type="button" class="btn btn-sm btn-outline-dark rounded-pill px-3 py-1 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm" onclick="printProReport()">
             <i class="bi bi-printer-fill text-danger"></i>
@@ -251,13 +256,19 @@
             </div>
 
             <!-- Boutons de commande carte -->
-            <div class="d-flex align-items-center gap-2">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
               <!-- Switch satellite/plan -->
               <div class="btn-group btn-group-sm shadow-sm" role="group">
                 <button type="button" class="btn btn-outline-secondary active map-layer-btn" id="btnLayerSat" onclick="setMapLayer('satellite')">Satellite</button>
                 <button type="button" class="btn btn-outline-secondary map-layer-btn" id="btnLayerOsm" onclick="setMapLayer('osm')">Plan</button>
                 <button type="button" class="btn btn-outline-secondary map-layer-btn" id="btnLayerDark" onclick="setMapLayer('dark')">Sombre</button>
               </div>
+
+              <!-- Bouton Calque Propagation ML -->
+              <button type="button" class="btn btn-sm btn-outline-danger shadow-sm fw-bold d-inline-flex align-items-center gap-1 active" id="btnToggleSpreadLayer" onclick="toggleSpreadLayer()" title="Afficher/Masquer le calque prédictif de propagation ML">
+                <i class="bi bi-radar"></i>
+                <span class="d-none d-sm-inline">Calque ML</span>
+              </button>
 
               <!-- Switch Rayon cercle -->
               <button type="button" class="btn btn-sm btn-outline-secondary shadow-sm" id="btnToggleCircle" onclick="toggleRadiusCircle()" title="Afficher/Masquer le cercle de rayon">
@@ -289,6 +300,19 @@
               </div>
               <div class="d-flex align-items-center gap-2 small">
                 <span class="legend-dot" style="background: #dc2626;"></span> &gt; 50 MW (Critique)
+              </div>
+              <div class="fw-bold small mb-1 text-dark border-top pt-2 mt-2">Propagation ML (24h) :</div>
+              <div class="d-flex align-items-center gap-2 small">
+                <span class="legend-dot" style="background: #dc2626; box-shadow: 0 0 0 2px rgba(220,38,38,0.4);"></span> &ge; 70% (Critique)
+              </div>
+              <div class="d-flex align-items-center gap-2 small">
+                <span class="legend-dot" style="background: #ea580c;"></span> 45 - 70% (Élevé)
+              </div>
+              <div class="d-flex align-items-center gap-2 small">
+                <span class="legend-dot" style="background: #f59e0b;"></span> 25 - 45% (Modéré)
+              </div>
+              <div class="d-flex align-items-center gap-2 small">
+                <span class="legend-dot" style="background: #10b981;"></span> &lt; 25% (Faible)
               </div>
             </div>
 
@@ -413,6 +437,143 @@
               </a>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════
+         SECTION PRÉDICTIVE ML : PROPAGATION DU FEU (LIGHTGBM 24H)
+         ══════════════════════════════════════════════════════════ -->
+    <div id="mlSpreadDashboardSection" class="row g-4 mt-2 d-none">
+      <div class="col-12">
+        <div class="card border-0 shadow-sm rounded-4 bg-white overflow-hidden">
+          <div class="card-header bg-gradient p-3 d-flex align-items-center justify-content-between flex-wrap gap-2" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white;">
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge bg-danger rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 34px; height: 34px;">
+                <i class="bi bi-cpu-fill text-white fs-6"></i>
+              </span>
+              <div>
+                <h5 class="mb-0 fw-bold">Modèle Prédictif ML : Risque de Propagation dans les 24h</h5>
+                <small class="text-white-50">Algorithme LightGBM calibré sur le climat estival & vent dominant de Tunisie • Modèle : <span id="mlModelVersionBadge">lightgbm_fire_spread:v1</span></small>
+              </div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge bg-warning text-dark fw-bold px-3 py-2 rounded-pill shadow-sm">
+                <i class="bi bi-lightning-charge-fill me-1"></i>Prédiction 24h Active
+              </span>
+            </div>
+          </div>
+
+          <div class="card-body p-4">
+            <!-- 4 KPIs Prédictifs -->
+            <div class="row g-3 mb-4">
+              <div class="col-xl-3 col-md-6">
+                <div class="p-3 rounded-4 border bg-danger-subtle border-danger-subtle h-100">
+                  <div class="small fw-bold text-danger text-uppercase mb-1"><i class="bi bi-exclamation-octagon-fill me-1"></i>Cellules Risque Critique</div>
+                  <h3 id="mlKpiCritique" class="fw-bolder text-danger mb-0">0</h3>
+                  <small class="text-muted">Probabilité &ge; 70% (front actif)</small>
+                </div>
+              </div>
+              <div class="col-xl-3 col-md-6">
+                <div class="p-3 rounded-4 border bg-warning-subtle border-warning-subtle h-100">
+                  <div class="small fw-bold text-warning-emphasis text-uppercase mb-1"><i class="bi bi-cone-striped me-1"></i>Cellules Risque Élevé</div>
+                  <h3 id="mlKpiEleve" class="fw-bolder text-dark mb-0">0</h3>
+                  <small class="text-muted">Probabilité entre 45% et 70%</small>
+                </div>
+              </div>
+              <div class="col-xl-3 col-md-6">
+                <div class="p-3 rounded-4 border bg-light h-100">
+                  <div class="small fw-bold text-secondary text-uppercase mb-1"><i class="bi bi-arrows-angle-expand me-1"></i>Surface Menacée Estimée</div>
+                  <h3 id="mlKpiArea" class="fw-bolder text-dark mb-0">0 km²</h3>
+                  <small class="text-muted">Rayon de propagation sous surveillance</small>
+                </div>
+              </div>
+              <div class="col-xl-3 col-md-6">
+                <div class="p-3 rounded-4 border bg-primary-subtle border-primary-subtle h-100">
+                  <div class="small fw-bold text-primary text-uppercase mb-1"><i class="bi bi-shield-shaded me-1"></i>Zones / Communes en Alerte</div>
+                  <h3 id="mlKpiThreatenedCount" class="fw-bolder text-primary mb-0">0</h3>
+                  <small class="text-muted">Localités à proximité directe du front</small>
+                </div>
+              </div>
+            </div>
+
+            <!-- Graphiques Chart.js & Facteurs Explicatifs -->
+            <div class="row g-4 mb-4">
+              <!-- Graphique 1 : Distribution des Niveaux de Risque -->
+              <div class="col-lg-5">
+                <div class="p-3 rounded-4 border bg-light h-100">
+                  <h6 class="fw-bold text-dark mb-3 d-flex align-items-center gap-2">
+                    <i class="bi bi-pie-chart-fill text-danger"></i>
+                    <span>Répartition des Cellules par Risque</span>
+                  </h6>
+                  <div style="height: 240px; position: relative;">
+                    <canvas id="chartSpreadDistribution"></canvas>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Graphique 2 : Facteurs Météo & Risque de Propagation -->
+              <div class="col-lg-7">
+                <div class="p-3 rounded-4 border bg-light h-100">
+                  <h6 class="fw-bold text-dark mb-3 d-flex align-items-center gap-2">
+                    <i class="bi bi-bar-chart-fill text-warning"></i>
+                    <span>Facteurs Clés Influant la Propagation (Poids ML)</span>
+                  </h6>
+                  <div style="height: 240px; position: relative;">
+                    <canvas id="chartSpreadFactors"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tableau des Zones / Communes Menacées Prioritaires -->
+            <div class="border rounded-4 overflow-hidden">
+              <div class="p-3 bg-light border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <h6 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                  <i class="bi bi-buildings-fill text-danger"></i>
+                  <span>Zones Habitées & Massifs Forestiers Menacés dans les 24h</span>
+                </h6>
+                <span class="badge bg-danger rounded-pill" id="mlBadgeZonesCount">0 zone(s)</span>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" id="mlThreatenedZonesTable">
+                  <thead class="table-light small text-uppercase text-muted">
+                    <tr>
+                      <th class="ps-3">Zone / Commune</th>
+                      <th>Gouvernorat</th>
+                      <th>Distance au Front</th>
+                      <th>Probabilité Max</th>
+                      <th>Niveau de Risque</th>
+                      <th>Recommandation Protection Civile</th>
+                    </tr>
+                  </thead>
+                  <tbody id="mlThreatenedZonesBody">
+                    <tr>
+                      <td colspan="6" class="text-center py-4 text-muted">
+                        Cliquez sur "Prédire la Propagation (ML 24h)" pour lancer le diagnostic spatial.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast HeatAlert (Sans alert() du navigateur) -->
+    <div id="fireToastWrapper" class="position-fixed top-0 end-0 p-3" style="z-index: 999999; margin-top: 75px;">
+      <div id="fireToastNotification" class="toast align-items-center text-white border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true" style="display: none; min-width: 320px; max-width: 440px; border-radius: 16px; background: rgba(15, 23, 42, 0.96); backdrop-filter: blur(12px); border-left: 5px solid #f59e0b;">
+        <div class="d-flex p-3 align-items-center">
+          <div id="fireToastIcon" class="me-3 fs-3 text-warning">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+          </div>
+          <div class="toast-body p-0 flex-grow-1" style="font-size: 13.5px; font-weight: 500; line-height: 1.45;" id="fireToastMessage">
+            Aucun foyer actif détecté pour calculer la propagation.
+          </div>
+          <button type="button" class="btn-close btn-close-white ms-2 me-0" onclick="hideFireToast()" aria-label="Fermer"></button>
         </div>
       </div>
     </div>
@@ -645,12 +806,27 @@
       display: none !important;
     }
   }
+  /* Toast Notification Animation */
+  .toast-slide-animate {
+    animation: toastSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  @keyframes toastSlideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-20px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
 </style>
 @endpush
 
 @push('scripts')
-{{-- Leaflet.js --}}
+{{-- Leaflet.js & Chart.js --}}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
 <script>
 (function() {
@@ -668,11 +844,15 @@
   let map = null;
   let mapTileLayer = null;
   let markersLayerGroup = null;
+  let spreadLayerGroup = null;
   let radiusCircle = null;
   let centerMarker = null;
 
   let cachedHotspots = [];
   let currentTileType = 'satellite';
+  let chartDistribution = null;
+  let chartFactors = null;
+  let lastSpreadData = null;
 
   // Couches de tuiles
   const TILE_PROVIDERS = {
@@ -714,6 +894,9 @@
 
     // Groupe de calques pour les feux
     markersLayerGroup = L.layerGroup().addTo(map);
+
+    // Groupe de calques pour la propagation ML LightGBM
+    spreadLayerGroup = L.layerGroup().addTo(map);
 
     // Dessin du rayon initial
     updateCenterRadiusOverlay();
@@ -1074,7 +1257,7 @@
 
   window.locateUserPosition = function() {
     if (!navigator.geolocation) {
-      alert("La géolocalisation n'est pas supportée par votre navigateur.");
+      showFireToast("La géolocalisation n'est pas supportée par votre navigateur.", "warning");
       return;
     }
 
@@ -1097,7 +1280,7 @@
       },
       err => {
         if (loadingOverlay) loadingOverlay.classList.add('d-none');
-        alert("Impossible de récupérer votre position GPS. Veuillez autoriser la localisation.");
+        showFireToast("Impossible de récupérer votre position GPS. Veuillez autoriser la localisation.", "warning");
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
@@ -1227,6 +1410,312 @@
 
     // Déclenchement de l'impression
     window.print();
+  };
+
+  // ═══════════════════════════════════════════════════════════
+  // ─── NOTIFICATION TOAST PERSONNALISÉE (SANS ALERT NAVIGATEUR)
+  // ═══════════════════════════════════════════════════════════
+
+  let fireToastTimer = null;
+  window.showFireToast = function(message, type = 'warning') {
+    const toast = document.getElementById('fireToastNotification');
+    const msgEl = document.getElementById('fireToastMessage');
+    const iconEl = document.getElementById('fireToastIcon');
+    if (!toast || !msgEl) return;
+
+    msgEl.textContent = message;
+
+    const config = {
+      warning: { icon: 'bi-exclamation-triangle-fill', textClass: 'text-warning', border: '#f59e0b' },
+      info:    { icon: 'bi-info-circle-fill',         textClass: 'text-primary', border: '#3b82f6' },
+      danger:  { icon: 'bi-fire',                     textClass: 'text-danger',  border: '#dc2626' },
+      success: { icon: 'bi-check-circle-fill',        textClass: 'text-success', border: '#10b981' }
+    };
+    const c = config[type] || config.warning;
+
+    if (iconEl) {
+      iconEl.className = `me-3 fs-3 ${c.textClass}`;
+      iconEl.innerHTML = `<i class="bi ${c.icon}"></i>`;
+    }
+    toast.style.borderLeft = `5px solid ${c.border}`;
+    toast.style.display = 'block';
+    toast.classList.remove('toast-slide-animate');
+    void toast.offsetWidth; // Force le recalcul du layout pour réactiver l'animation fluide
+    toast.classList.add('show');
+    toast.classList.add('toast-slide-animate');
+
+    if (fireToastTimer) clearTimeout(fireToastTimer);
+    fireToastTimer = setTimeout(() => {
+      hideFireToast();
+    }, 4500);
+  };
+
+  window.hideFireToast = function() {
+    const toast = document.getElementById('fireToastNotification');
+    if (!toast) return;
+    toast.classList.remove('show');
+    toast.classList.remove('toast-slide-animate');
+    setTimeout(() => {
+      toast.style.display = 'none';
+    }, 250);
+  };
+
+  // ═══════════════════════════════════════════════════════════
+  // ─── PRÉDICTION ML DE PROPAGATION DU FEU (LIGHTGBM 24H) ───
+  // ═══════════════════════════════════════════════════════════
+
+  window.runFireSpreadPrediction = function() {
+    // Si aucun foyer actif n'est actuellement détecté, afficher le toast personnalisé
+    if (!cachedHotspots || cachedHotspots.length === 0) {
+      showFireToast("Aucun foyer actif détecté pour calculer la propagation.", "warning");
+      return;
+    }
+
+    const btn = document.getElementById('btnPredictSpread');
+    const originalHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Calcul LightGBM...';
+    }
+
+    const payload = {
+      hotspots: cachedHotspots,
+      lat: currentLat,
+      lng: currentLng,
+      radius: currentRadius,
+      days: currentDays,
+      source: currentSource
+    };
+
+    fetch("{{ route('front.fires.predict_spread') }}", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+      },
+      body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+      }
+
+      if (!data.success) {
+        showFireToast(data.message || "Aucun foyer actif détecté pour calculer la propagation.", "warning");
+        return;
+      }
+
+      lastSpreadData = data;
+      renderFireSpreadPredictions(data);
+    })
+    .catch(err => {
+      console.error('Erreur Prédiction ML :', err);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+      }
+      showFireToast("Erreur lors de la communication avec le microservice ML.", "danger");
+    });
+  };
+
+  function renderFireSpreadPredictions(data) {
+    if (!spreadLayerGroup) return;
+    spreadLayerGroup.clearLayers();
+
+    const preds = data.predictions || [];
+    const summary = data.summary || {};
+    const threatenedZones = data.threatened_zones || [];
+
+    // 1. Marqueurs circulaires sur la carte Leaflet
+    const levelColors = {
+      critique: { color: '#dc2626', fill: '#dc2626', radius: 14, opacity: 0.85, label: 'CRITIQUE' },
+      eleve:    { color: '#ea580c', fill: '#ea580c', radius: 11, opacity: 0.75, label: 'ÉLEVÉ' },
+      modere:   { color: '#f59e0b', fill: '#f59e0b', radius: 8,  opacity: 0.65, label: 'MODÉRÉ' },
+      faible:   { color: '#10b981', fill: '#10b981', radius: 6,  opacity: 0.50, label: 'FAIBLE' }
+    };
+
+    preds.forEach(p => {
+      const cfg = levelColors[p.niveau] || levelColors.faible;
+      const probPct = (p.probabilite * 100).toFixed(1);
+
+      const circle = L.circleMarker([p.lat, p.lon], {
+        radius: cfg.radius,
+        color: cfg.color,
+        fillColor: cfg.fill,
+        fillOpacity: cfg.opacity,
+        weight: p.niveau === 'critique' ? 3 : 1.5,
+        dashArray: p.niveau === 'critique' ? '4, 4' : null
+      });
+
+      const factorsHtml = (p.facteurs_principaux || []).map(f => `<li class="small text-muted">${f}</li>`).join('');
+
+      const popupHtml = `
+        <div style="min-width: 250px; font-family: sans-serif;">
+          <div class="d-flex align-items-center justify-content-between mb-2 pb-1 border-bottom">
+            <span class="badge" style="background: ${cfg.color}; color: #fff; font-weight: bold; font-size: 11px;">
+              RISQUE ${cfg.label}
+            </span>
+            <strong style="color: ${cfg.color}; font-size: 15px;">${probPct}%</strong>
+          </div>
+          <div class="small mb-2">
+            <strong>Coordonnées :</strong> ${p.lat.toFixed(3)} N, ${p.lon.toFixed(3)} E<br>
+            <strong>Distance au front :</strong> ${p.dist_closest_fire_km ? p.dist_closest_fire_km.toFixed(1) + ' km' : 'N/A'}<br>
+            ${p.threatened_zone ? `<strong class="text-danger">Zone :</strong> ${p.threatened_zone}` : ''}
+          </div>
+          <div class="small fw-bold text-dark border-top pt-1 mt-1">Facteurs de propagation 24h :</div>
+          <ul class="ps-3 mb-0" style="padding-left: 16px; margin-bottom: 0;">
+            ${factorsHtml}
+          </ul>
+        </div>
+      `;
+
+      circle.bindPopup(popupHtml);
+      circle.bindTooltip(`Propagation : ${probPct}% (${cfg.label})`, { direction: 'top', offset: [0, -5] });
+      spreadLayerGroup.addLayer(circle);
+    });
+
+    // 2. Mise à jour des KPIs
+    document.getElementById('mlKpiCritique').textContent = summary.critique || 0;
+    document.getElementById('mlKpiEleve').textContent = summary.eleve || 0;
+    const estimatedAreaKm2 = ((summary.critique || 0) + (summary.eleve || 0)) * 25;
+    document.getElementById('mlKpiArea').textContent = `${estimatedAreaKm2} km²`;
+    document.getElementById('mlKpiThreatenedCount').textContent = threatenedZones.length;
+    document.getElementById('mlBadgeZonesCount').textContent = `${threatenedZones.length} zone(s)`;
+    if (data.model_version) {
+      document.getElementById('mlModelVersionBadge').textContent = data.model_version;
+    }
+
+    // 3. Mise à jour du tableau des zones menacées
+    const tbody = document.getElementById('mlThreatenedZonesBody');
+    if (tbody) {
+      if (threatenedZones.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" class="text-center py-4 text-success fw-semibold">
+              <i class="bi bi-shield-check fs-4 d-block mb-1"></i>
+              Aucune zone urbaine ou agglomération habitée directement menacée dans les 24 prochaines heures.
+            </td>
+          </tr>
+        `;
+      } else {
+        tbody.innerHTML = threatenedZones.map(z => {
+          const isCrit = z.max_risk_level === 'critique';
+          const badgeClass = isCrit ? 'bg-danger text-white' : 'bg-warning text-dark';
+          const recText = isCrit
+            ? '<span class="text-danger fw-bold"><i class="bi bi-exclamation-triangle-fill me-1"></i>Alerte Rouge : Évacuation préventive & Coupe-feu</span>'
+            : '<span class="text-warning-emphasis fw-semibold"><i class="bi bi-cone-striped me-1"></i>Vigilance Renforcée : Patrouille forestière</span>';
+
+          return `
+            <tr>
+              <td class="ps-3 fw-bold text-dark">${z.nom}</td>
+              <td>${z.gouvernorat || z.ville || '-'}</td>
+              <td><span class="badge bg-light text-dark border">${z.distance_to_risk_cell_km} km</span></td>
+              <td class="fw-bold">${(z.max_probability * 100).toFixed(1)}%</td>
+              <td><span class="badge ${badgeClass} text-uppercase px-2 py-1">${z.max_risk_level}</span></td>
+              <td>${recText}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+
+    // 4. Graphiques Chart.js
+    renderSpreadCharts(summary);
+
+    // 5. Afficher la section et scroller vers elle
+    const section = document.getElementById('mlSpreadDashboardSection');
+    if (section) {
+      section.classList.remove('d-none');
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  function renderSpreadCharts(summary) {
+    if (typeof Chart === 'undefined') return;
+
+    // Graphique 1 : Doughnut Répartition du risque
+    const canvas1 = document.getElementById('chartSpreadDistribution');
+    if (canvas1) {
+      const ctx1 = canvas1.getContext('2d');
+      if (chartDistribution) chartDistribution.destroy();
+      chartDistribution = new Chart(ctx1, {
+        type: 'doughnut',
+        data: {
+          labels: ['Critique (>=70%)', 'Élevé (45-70%)', 'Modéré (25-45%)', 'Faible (<25%)'],
+          datasets: [{
+            data: [
+              summary.critique || 0,
+              summary.eleve || 0,
+              summary.modere || 0,
+              summary.faible || 0
+            ],
+            backgroundColor: ['#dc2626', '#ea580c', '#f59e0b', '#10b981'],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+          }
+        }
+      });
+    }
+
+    // Graphique 2 : Facteurs d'Influence ML
+    const canvas2 = document.getElementById('chartSpreadFactors');
+    if (canvas2) {
+      const ctx2 = canvas2.getContext('2d');
+      if (chartFactors) chartFactors.destroy();
+      chartFactors = new Chart(ctx2, {
+        type: 'bar',
+        data: {
+          labels: ['Alignement Vent', 'Intensité Foyer (FRP)', 'Indice Angström', 'Chaleur Caniculaire', 'Sécheresse Sols'],
+          datasets: [{
+            label: 'Poids Relatif d\'Impact ML (%)',
+            data: [35, 25, 18, 14, 8],
+            backgroundColor: ['#ea580c', '#dc2626', '#f59e0b', '#ef4444', '#8b5cf6'],
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis: 'y',
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            x: { beginAtZero: true, max: 40, ticks: { callback: v => v + '%' } }
+          }
+        }
+      });
+    }
+  }
+
+  window.toggleSpreadLayer = function() {
+    if (!map || !spreadLayerGroup) return;
+    const btn = document.getElementById('btnToggleSpreadLayer');
+    if (map.hasLayer(spreadLayerGroup)) {
+      map.removeLayer(spreadLayerGroup);
+      if (btn) {
+        btn.classList.remove('active');
+        btn.classList.remove('btn-danger');
+        btn.classList.add('btn-outline-danger');
+      }
+    } else {
+      map.addLayer(spreadLayerGroup);
+      if (btn) {
+        btn.classList.add('active');
+        btn.classList.add('btn-danger');
+        btn.classList.remove('btn-outline-danger');
+      }
+    }
   };
 
 })();

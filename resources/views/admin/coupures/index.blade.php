@@ -8,7 +8,10 @@
     <h1><i class="fa-solid fa-bolt me-2 text-warning"></i>Gestion des Coupures</h1>
     <p class="subtitle">{{ $coupures->total() }} coupure(s) enregistrée(s).</p>
   </div>
-  <div class="page-header__actions">
+  <div class="page-header__actions d-flex gap-2">
+    <a href="{{ route('admin.steg.index') }}" class="m-btn m-btn--warning" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #fff; border:none; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);">
+      <i class="fa-solid fa-plug-circle-bolt me-1"></i> Sync STEG Officielle
+    </a>
     <a href="{{ route('admin.coupures.create') }}" class="m-btn m-btn--primary">
       <i class="fa-solid fa-plus"></i> Nouvelle coupure
     </a>

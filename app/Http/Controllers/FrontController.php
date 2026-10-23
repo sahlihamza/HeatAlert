@@ -12,6 +12,8 @@ use App\Services\NasaFirmsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -113,7 +115,10 @@ class FrontController extends Controller
             'vert'   => $zone->alertes()->where('niveau', 'vert')->count(),
         ];
 
-        return view('front.zones.show', compact('zone', 'alertes', 'niveauxData'));
+        // Dernière prédiction ML disponible pour cette zone
+        $latestPrediction = $zone->latestPrediction;
+
+        return view('front.zones.show', compact('zone', 'alertes', 'niveauxData', 'latestPrediction'));
     }
 
     /**
@@ -283,11 +288,45 @@ class FrontController extends Controller
             ];
         })->values();
 
+        $userZone = null;
+        $zonePrediction = null;
+        if (auth()->check() && auth()->user()->zone_id) {
+            $userZone = Zone::with('latestPrediction')->find(auth()->user()->zone_id);
+            $zonePrediction = $userZone?->latestPrediction;
+        }
+
+        // Cartographie nationale du risque de coupure pour les citoyens
+        $mapZones = Zone::query()
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->with('latestPrediction')
+            ->get()
+            ->map(function ($z) {
+                $p = $z->latestPrediction;
+                return [
+                    'id' => $z->id,
+                    'nom' => $z->nom,
+                    'ville' => $z->ville,
+                    'gouvernorat' => $z->gouvernorat,
+                    'lat' => (float) $z->latitude,
+                    'lng' => (float) $z->longitude,
+                    'probability' => $p ? (float) $p->probability : null,
+                    'risk_level' => $p ? $p->risk_level : 'none',
+                    'outage_start' => $p?->estimated_outage_start?->format('d/m à H:i'),
+                    'outage_end' => $p?->estimated_outage_end?->format('H:i'),
+                    'cause' => $p?->estimated_outage_cause,
+                    'url' => route('front.zones.show', $z),
+                ];
+            });
+
         return view('front.coupures.index', [
             'coupures' => $coupures,
             'types' => Coupure::TYPES,
             'statuts' => Coupure::STATUTS,
             'calendrierEvents' => $calendrierEvents,
+            'userZone' => $userZone,
+            'zonePrediction' => $zonePrediction,
+            'mapZones' => $mapZones,
         ]);
     }
 
@@ -472,5 +511,131 @@ class FrontController extends Controller
         ];
 
         return response()->json($data);
+    }
+
+    /**
+     * Prédiction ML de propagation du feu dans les 24h via le microservice LightGBM.
+     */
+    public function firesPredictSpread(Request $request, NasaFirmsService $firmsService): JsonResponse
+    {
+        $hotspots = $request->input('hotspots');
+        $cells    = $request->input('cells', []);
+        $weather  = $request->input('weather', []);
+
+        // Si aucun hotspot fourni, les récupérer depuis le service FIRMS
+        if (empty($hotspots) && empty($cells)) {
+            $lat    = $request->filled('lat') ? (float) $request->input('lat') : null;
+            $lng    = $request->filled('lng') ? (float) $request->input('lng') : null;
+            $radius = $request->input('radius', 50);
+            $days   = (int) $request->input('days', 1);
+            $source = (string) $request->input('source', 'VIIRS_SNPP_NRT');
+            $mapKey = $request->filled('map_key') ? (string) $request->input('map_key') : null;
+
+            $firmsData = $firmsService->getHotspots($lat, $lng, $radius, $days, $source, $mapKey, 'TUN');
+            $hotspots  = $firmsData['hotspots'] ?? [];
+        }
+
+        if (empty($hotspots) && empty($cells)) {
+            return response()->json([
+                'success'          => false,
+                'message'          => 'Aucun foyer actif détecté pour calculer la propagation.',
+                'total_cells'      => 0,
+                'predictions'      => [],
+                'threatened_zones' => [],
+                'summary'          => ['critique' => 0, 'eleve' => 0, 'modere' => 0, 'faible' => 0],
+            ]);
+        }
+
+        $mlUrl   = rtrim((string) config('services.heatalert_ml.url', 'http://127.0.0.1:8001'), '/') . '/predict/feu';
+        $timeout = (int) config('services.heatalert_ml.timeout', 8);
+
+        try {
+            $response = Http::timeout($timeout)->post($mlUrl, [
+                'cells'           => $cells,
+                'active_hotspots' => $hotspots,
+                'weather'         => empty($weather) ? null : (array) $weather,
+            ]);
+
+            if ($response->failed()) {
+                Log::warning('ML fire spread returned error: ' . $response->status(), ['body' => $response->body()]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Le service ML de propagation a renvoyé une erreur.',
+                ], 502);
+            }
+
+            $mlData      = $response->json();
+            $predictions = $mlData['predictions'] ?? [];
+
+            // Identifier les zones HeatAlert menacées (dans un rayon de 12 km des cellules critiques/élevées)
+            $zones           = Zone::where('actif', true)->whereNotNull('latitude')->whereNotNull('longitude')->get();
+            $threatenedZones = [];
+
+            foreach ($predictions as &$pred) {
+                if (in_array($pred['niveau'], ['critique', 'eleve', 'modere'])) {
+                    foreach ($zones as $zone) {
+                        $dist = $this->calculateHaversine(
+                            (float) $pred['lat'],
+                            (float) $pred['lon'],
+                            (float) $zone->latitude,
+                            (float) $zone->longitude
+                        );
+                        if ($dist <= 12.0) {
+                            $zoneKey = $zone->id;
+                            if (!isset($threatenedZones[$zoneKey])) {
+                                $threatenedZones[$zoneKey] = [
+                                    'id'                       => $zone->id,
+                                    'nom'                      => $zone->nom,
+                                    'ville'                    => $zone->ville,
+                                    'gouvernorat'              => $zone->gouvernorat,
+                                    'latitude'                 => (float) $zone->latitude,
+                                    'longitude'                => (float) $zone->longitude,
+                                    'max_risk_level'           => $pred['niveau'],
+                                    'max_probability'          => $pred['probabilite'],
+                                    'distance_to_risk_cell_km' => round($dist, 1),
+                                ];
+                            } else {
+                                if ($pred['probabilite'] > $threatenedZones[$zoneKey]['max_probability']) {
+                                    $threatenedZones[$zoneKey]['max_probability']          = $pred['probabilite'];
+                                    $threatenedZones[$zoneKey]['max_risk_level']           = $pred['niveau'];
+                                    $threatenedZones[$zoneKey]['distance_to_risk_cell_km'] = round($dist, 1);
+                                }
+                            }
+                            $pred['threatened_zone'] = $zone->nom;
+                        }
+                    }
+                }
+            }
+            unset($pred);
+
+            // Trier les zones menacées par probabilité décroissante
+            usort($threatenedZones, fn($a, $b) => $b['max_probability'] <=> $a['max_probability']);
+
+            return response()->json([
+                'success'          => true,
+                'total_cells'      => count($predictions),
+                'predictions'      => $predictions,
+                'summary'          => $mlData['summary'] ?? [],
+                'threatened_zones' => array_values($threatenedZones),
+                'model_version'    => $mlData['model_version'] ?? 'lightgbm_fire_spread:v1',
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Erreur appel ML Fire Spread: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Impossible de joindre le microservice de prédiction ML (' . $e->getMessage() . ')',
+            ], 503);
+        }
+    }
+
+    private function calculateHaversine(float $lat1, float $lon1, float $lat2, float $lon2): float
+    {
+        $earthRadius = 6371.0;
+        $dLat        = deg2rad($lat2 - $lat1);
+        $dLon        = deg2rad($lon2 - $lon1);
+        $a           = sin($dLat / 2) * sin($dLat / 2) +
+            cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
+            sin($dLon / 2) * sin($dLon / 2);
+        return 2 * $earthRadius * atan2(sqrt($a), sqrt(1 - $a));
     }
 }

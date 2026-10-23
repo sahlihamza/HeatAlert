@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Zone extends Model
 {
@@ -38,5 +39,15 @@ class Zone extends Model
     public function pointsFraicheur(): HasMany
     {
         return $this->hasMany(PointFraicheur::class);
+    }
+
+    public function predictions(): HasMany
+    {
+        return $this->hasMany(PredictionCoupure::class);
+    }
+
+    public function latestPrediction(): HasOne
+    {
+        return $this->hasOne(PredictionCoupure::class)->latestOfMany('reference_at');
     }
 }

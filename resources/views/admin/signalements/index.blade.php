@@ -97,6 +97,7 @@
           <th>Auteur</th>
           <th>Coupure liée</th>
           <th>Description</th>
+          <th>Analyse automatique</th>
           <th style="text-align:center;">Photo</th>
           <th style="text-align:center;">Statut</th>
           <th style="text-align:center;">Date</th>
@@ -128,6 +129,23 @@
               @endif
             </td>
             <td>{{ Str::limit($signalement->description, 75) }}</td>
+            <td style="min-width:190px;">
+              @php $analysis = $signalement->anomaly_analysis; @endphp
+              @php
+                $analysisClass = match($analysis['level']) {
+                  'high' => 'bg-danger-subtle text-danger border border-danger-subtle',
+                  'medium' => 'bg-warning-subtle text-warning-emphasis border border-warning-subtle',
+                  'unavailable' => 'bg-secondary-subtle text-secondary border border-secondary-subtle',
+                  default => 'bg-success-subtle text-success border border-success-subtle',
+                };
+              @endphp
+              <span class="badge {{ $analysisClass }}" title="{{ implode(' · ', $analysis['reasons']) }}">
+                @if($analysis['score'] !== null){{ $analysis['score'] }}/100 · @endif{{ $analysis['label'] }}
+              </span>
+              @foreach($analysis['reasons'] as $reason)
+                <small class="d-block text-muted mt-1">{{ $reason }}</small>
+              @endforeach
+            </td>
             <td style="text-align:center;">
               @if($signalement->photo_url)
                 <img src="{{ $signalement->photo_url }}"
@@ -184,7 +202,7 @@
           </tr>
         @empty
           <tr id="signalements-no-records">
-            <td colspan="7" class="text-center py-4 text-muted">
+            <td colspan="8" class="text-center py-4 text-muted">
               <i class="fa-solid fa-flag fa-2x mb-2 d-block text-secondary"></i>
               Aucun signalement trouvé.
             </td>
@@ -274,7 +292,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!emptyRow) {
           emptyRow = document.createElement('tr');
           emptyRow.id = 'signalements-live-empty-row';
-          emptyRow.innerHTML = `<td colspan="7" class="text-center py-4 text-muted"><i class="fa-solid fa-magnifying-glass fa-2x mb-2 d-block text-secondary"></i>Aucun signalement ne correspond à « <em>${q}</em> ».</td>`;
+          emptyRow.innerHTML = `<td colspan="8" class="text-center py-4 text-muted"><i class="fa-solid fa-magnifying-glass fa-2x mb-2 d-block text-secondary"></i>Aucun signalement ne correspond à « <em>${q}</em> ».</td>`;
           tbody.appendChild(emptyRow);
         } else {
           emptyRow.style.display = '';

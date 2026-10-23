@@ -1,17 +1,49 @@
-.git
-.github
+# Git & CI/CD
+.git/
+.github/
+.gitignore
+.gitattributes
+
+# Environment & Local Secrets (NEVER bake into image)
 .env
 .env.*
-node_modules
-vendor
+!.env.example
+
+# Dependencies (built inside Docker multi-stage)
+/vendor/
+/node_modules/
+
+# Local build artifacts
+/public/build/
+/public/hot
+/public/storage
+
+# Laravel Storage & Logs
+storage/*.key
 storage/logs/*
-storage/framework/cache/*
+storage/framework/cache/data/*
 storage/framework/sessions/*
 storage/framework/views/*
-Dockerfile
-docker-compose.yml
-README.md
-tests
-scriptdatabase.sql
+
+# Tests & Analysis
+/tests/
+phpunit.xml
 .phpunit.result.cache
-public/storage
+
+# Editor & OS files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Documentation & Temporary notes
+*.md
+!README.md
+azuretts.txt
+lancer.txt
+scriptdatabase.sql
+# Deployment-specific files
+docker-compose.yml
+/scriptdatabase.sql

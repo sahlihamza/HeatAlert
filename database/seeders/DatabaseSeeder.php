@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             ConseilSeeder::class,
             CoupureSeeder::class,
             PointFraicheurSeeder::class,
+            EquipementSensibleSeeder::class,
         ]);
     }
 }

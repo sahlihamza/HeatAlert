@@ -109,6 +109,20 @@
                     <span>Points de Fraîcheur</span>
                   </a>
                 </li>
+                @auth
+                <li>
+                  <a href="{{ route('front.equipements_sensibles.index') }}" class="d-flex align-items-center gap-2 {{ request()->routeIs('front.equipements_sensibles.*') ? 'active' : '' }}">
+                    <i class="bi bi-tools text-warning"></i>
+                    <span>Préparation personnelle</span>
+                  </a>
+                </li>
+                <li>
+                  <a href="{{ route('front.module4_notifications.index') }}" class="d-flex align-items-center gap-2 {{ request()->routeIs('front.module4_notifications.*') ? 'active' : '' }}">
+                    <i class="bi bi-envelope-heart text-danger"></i>
+                    <span>Conseils par e-mail</span>
+                  </a>
+                </li>
+                @endauth
                 <li>
                   <a href="{{ route('front.fires.index') }}" class="d-flex align-items-center gap-2 {{ request()->routeIs('front.fires.*') ? 'active' : '' }}" title="Détecte les départs de feux près d'une zone via l'API NASA FIRMS">
                     <i class="bi bi-fire text-danger"></i>
@@ -133,6 +147,9 @@
                 <li><a href="{{ route('profile.edit') }}" class="{{ request()->routeIs('profile.*') ? 'active' : '' }}"><i class="bi bi-person-circle me-2 text-black"></i>Mon Profil</a></li>
                 <li><a href="{{ route('front.zones.index') }}"><i class="bi bi-geo-alt me-2"></i>Mes Zones</a></li>
                 <li><a href="{{ route('front.alertes.index') }}"><i class="bi bi-bell me-2"></i>Alertes Actives</a></li>
+                <li><a href="{{ route('front.notifications.index') }}"><i class="bi bi-bell-fill me-2 text-danger"></i>Mes notifications @if(auth()->user()->unreadNotifications_count ?? auth()->user()->unreadNotifications()->count())<span class="badge bg-danger ms-1">{{ auth()->user()->unreadNotifications()->count() }}</span>@endif</a></li>
+                <li><a href="{{ route('front.equipements_sensibles.index') }}"><i class="bi bi-shield-heart me-2 text-danger"></i>Ma préparation personnelle</a></li>
+                <li><a href="{{ route('front.module4_notifications.index') }}"><i class="bi bi-envelope-heart me-2 text-danger"></i>Notifications de prévention</a></li>
                 <li>
                   <form method="POST" action="{{ route('logout') }}">
                     @csrf

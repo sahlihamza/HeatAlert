@@ -33,8 +33,9 @@ class AuthService
             'password'         => Hash::make($data['password']),
             'telephone'        => $data['telephone'] ?? null,
             'zone_id'          => $data['zone_id'] ?? null,
-            'role'             => User::ROLE_USER,
-            'date_inscription' => now(),
+            'role'              => User::ROLE_USER,
+            'date_inscription'  => now(),
+            'email_verified_at' => $data['email_verified_at'] ?? null,
         ]);
     }
 }
