@@ -4,7 +4,7 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     branch: deployment/docker
-    autoDeployTrigger: commit
+    autoDeployTrigger: off
     plan: free
     region: frankfurt # ou oregon, ohio, singapore
     envVars:
