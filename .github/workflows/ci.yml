@@ -125,6 +125,6 @@ jobs:
             exit 1
           fi
 
-          curl --fail --silent --show-error --get \
+          curl --globoff --fail --silent --show-error --get \
             --data-urlencode "imgURL=${IMAGE_URL}" \
             "$RENDER_DEPLOY_HOOK_URL"
