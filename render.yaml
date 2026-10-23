@@ -1,10 +1,10 @@
 services:
   - type: web
-    name: heatalert-web
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    branch: deployment/docker
-    autoDeployTrigger: checksPass
+    name: heatalert
+    runtime: image
+    image:
+      url: ghcr.io/sahlihamza/heatalert:latest
+    autoDeployTrigger: off
     plan: free
     region: frankfurt # ou oregon, ohio, singapore
     envVars:
