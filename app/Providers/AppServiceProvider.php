@@ -23,6 +23,5 @@ class AppServiceProvider extends ServiceProvider
             || filter_var(env('FORCE_HTTPS', false), FILTER_VALIDATE_BOOLEAN)) {
             URL::forceScheme('https');
         }
-        }
     }
 }
