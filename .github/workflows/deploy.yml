@@ -6,10 +6,12 @@ on:
       - main
       - aziz
       - master
+      - deployment/docker
   pull_request:
     branches:
       - main
       - master
+      - deployment/docker
   workflow_dispatch:
 
 jobs:
@@ -138,8 +140,13 @@ jobs:
             exit 1
           fi
 
-          echo "Triggering Render deployment via Webhook..."
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$DEPLOY_HOOK_URL")
+          echo "Triggering Render deployment for commit ${GITHUB_SHA}..."
+          case "$DEPLOY_HOOK_URL" in
+            *\?*) DEPLOY_HOOK_URL="${DEPLOY_HOOK_URL}&ref=${GITHUB_SHA}" ;;
+            *) DEPLOY_HOOK_URL="${DEPLOY_HOOK_URL}?ref=${GITHUB_SHA}" ;;
+          esac
+
+          RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST "$DEPLOY_HOOK_URL")
           HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
 
