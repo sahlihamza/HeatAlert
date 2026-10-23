@@ -87,8 +87,8 @@ def test_predict_returns_probability_with_injected_model(tmp_path: Path):
 
     assert response.status_code == 200
     body = response.json()
-    assert body["probability"] == 0.2
-    assert body["risk_level"] is None
+    assert abs(body["probability"] - 0.874) < 1e-8
+    assert body["risk_level"] == "high"
     assert body["target_window_hours"] == 24
     assert body["model_version"] == "test-injected-model"
 
