@@ -6,35 +6,11 @@ from pathlib import Path
 import numpy as np
 from fastapi.testclient import TestClient
 
-from app.main import create_app
+from app.main import MODEL_FEATURES, create_app
 
 
 class FakeModel:
-    feature_names_in_ = np.array([
-        "latitude",
-        "longitude",
-        "zone_active",
-        "hour",
-        "day_of_week",
-        "month",
-        "temperature_min",
-        "temperature_max",
-        "temperature_ressentie",
-        "humidite",
-        "indice_uv",
-        "vitesse_vent",
-        "nb_coupures_24h",
-        "nb_coupures_7j",
-        "nb_coupures_30j",
-        "jours_depuis_coupure",
-        "nb_signalements_valides_7j",
-        "zone_id",
-        "ville",
-        "gouvernorat",
-        "alerte_type",
-        "alerte_niveau",
-        "alerte_active",
-    ])
+    feature_names_in_ = np.array(MODEL_FEATURES)
 
     def predict_proba(self, rows):
         assert list(rows.columns) == list(self.feature_names_in_)
