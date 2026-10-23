@@ -1,4 +1,4 @@
-FROM php:8.2-fpm
+FROM php:8.2-fpm AS app
 
 WORKDIR /var/www
 
@@ -32,6 +32,22 @@ RUN composer install \
     --no-interaction \
     --prefer-dist \
     --optimize-autoloader
+
+# Compile Vite assets as part of the same production image build.
+FROM node:22-alpine AS frontend
+
+WORKDIR /var/www
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+COPY --from=app /var/www/vendor/laravel/framework/src/Illuminate/Pagination/resources/views ./vendor/laravel/framework/src/Illuminate/Pagination/resources/views
+RUN npm run build
+
+FROM app AS runtime
+
+COPY --from=frontend --chown=www-data:www-data /var/www/public/build /var/www/public/build
 
 # Entrypoint et template nginx hors de /var/www : survivent au bind mount de docker-compose
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh

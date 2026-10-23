@@ -1,22 +1,23 @@
 name: HeatAlert CI
 
-permissions:
-  contents: read
-  packages: write
-
 on:
   push:
     branches:
-      - main
       - deployment/docker
-
   pull_request:
     branches:
-      - main
+      - deployment/docker
+
+permissions:
+  contents: read
+
+concurrency:
+  group: heatalert-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   tests:
-    name: Laravel Tests
+    name: Test application
     runs-on: ubuntu-24.04
 
     services:
@@ -47,15 +48,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Setup PHP
+      - name: Setup PHP 8.2
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
           extensions: mbstring, pdo_mysql, bcmath, gd, zip
           coverage: none
 
-      - name: Check PHP version
-        run: php -v
+      - name: Validate Composer files
+        run: composer validate --strict
 
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
@@ -66,72 +67,11 @@ jobs:
           php artisan key:generate
           php artisan config:clear
 
-      - name: Verify Laravel database configuration
-        run: php artisan config:show database
+      - name: Check PHP syntax
+        run: find app routes config -name '*.php' -exec php -l {} \;
 
       - name: Run migrations
         run: php artisan migrate --force
 
-      - name: Verify migrations status
-        run: php artisan migrate:status
-
-      - name: Run tests
+      - name: Run Laravel tests
         run: php artisan test
-
-  docker:
-    name: Build and Publish Docker Image
-    runs-on: ubuntu-24.04
-    needs: tests
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=raw,value=latest
-            type=sha
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-      - name: Deploy the tested commit to Render
-        if: github.event_name == 'push' && github.ref == 'refs/heads/deployment/docker'
-        env:
-          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-        shell: bash
-        run: |
-          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
-            echo "::error::GitHub Actions secret RENDER_DEPLOY_HOOK_URL is missing."
-            exit 1
-          fi
-
-          deploy_url="$RENDER_DEPLOY_HOOK_URL"
-          if [[ "$deploy_url" == *\?* ]]; then
-            deploy_url="${deploy_url}&ref=${GITHUB_SHA}"
-          else
-            deploy_url="${deploy_url}?ref=${GITHUB_SHA}"
-          fi
-
-          curl --fail --silent --show-error --request POST "$deploy_url"
-
