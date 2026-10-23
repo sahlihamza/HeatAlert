@@ -1,4 +1,4 @@
-name: CI/CD Pipeline - Build & Deploy to Render
+name: CI Pipeline - Build & Test
 
 on:
   push:
@@ -20,11 +20,11 @@ jobs:
   # ============================================================================
   ci:
     name: Run Tests & Build Assets
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup PHP 8.2
         uses: shivammathur/setup-php@v2
@@ -37,7 +37,7 @@ jobs:
         run: composer validate --strict
 
       - name: Cache Composer Dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: vendor
           key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
@@ -48,7 +48,7 @@ jobs:
         run: composer install --prefer-dist --no-interaction --no-progress
 
       - name: Setup Node.js 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: 'npm'
@@ -68,12 +68,12 @@ jobs:
   # ============================================================================
   test:
     name: Run Unit & Feature Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: ci
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup PHP 8.2
         uses: shivammathur/setup-php@v2
@@ -83,7 +83,7 @@ jobs:
           coverage: none
 
       - name: Cache Composer Dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: vendor
           key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
@@ -112,49 +112,3 @@ jobs:
 
       - name: Run Feature Tests
         run: php artisan test --testsuite=Feature --stop-on-failure
-
-  # ============================================================================
-  # JOB 3: Deploy to Render (Continuous Deployment)
-  # ============================================================================
-  deploy:
-    name: Deploy to Render
-    needs: [ci, test]
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Trigger Render Deploy Hook
-        env:
-          DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-        run: |
-          if [ -z "$DEPLOY_HOOK_URL" ]; then
-            echo "::error::Secret 'RENDER_DEPLOY_HOOK_URL' is missing!"
-            echo "-----------------------------------------------------------------------------"
-            echo "HOW TO FIX:"
-            echo "1. Go to your Render Dashboard (https://dashboard.render.com)."
-            echo "2. Open your Web Service -> Go to 'Settings' tab."
-            echo "3. Scroll down to 'Deploy Hook' and click 'Create Deploy Hook' or copy the URL."
-            echo "4. In your GitHub repository: Go to Settings -> Secrets and variables -> Actions."
-            echo "5. Click 'New repository secret', Name: RENDER_DEPLOY_HOOK_URL, Value: <your hook URL>."
-            echo "-----------------------------------------------------------------------------"
-            exit 1
-          fi
-
-          echo "Triggering Render deployment for commit ${GITHUB_SHA}..."
-          case "$DEPLOY_HOOK_URL" in
-            *\?*) DEPLOY_HOOK_URL="${DEPLOY_HOOK_URL}&ref=${GITHUB_SHA}" ;;
-            *) DEPLOY_HOOK_URL="${DEPLOY_HOOK_URL}?ref=${GITHUB_SHA}" ;;
-          esac
-
-          RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST "$DEPLOY_HOOK_URL")
-          HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
-
-          echo "Response from Render: $BODY"
-
-          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
-            echo "✅ Deployment successfully triggered on Render! (HTTP $HTTP_STATUS)"
-          else
-            echo "::error::Render deployment hook failed with status $HTTP_STATUS"
-            exit 1
-          fi
