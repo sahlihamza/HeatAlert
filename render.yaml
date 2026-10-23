@@ -7,6 +7,7 @@ services:
     autoDeployTrigger: off
     plan: free
     region: frankfurt # ou oregon, ohio, singapore
+    healthCheckPath: /up
     envVars:
       - key: APP_NAME
         value: HeatAlert
@@ -14,6 +15,8 @@ services:
         value: production
       - key: APP_DEBUG
         value: "false"
+      - key: HEATALERT_ML_URL
+        value: http://127.0.0.1:8001
       - key: APP_URL
         sync: false
       - key: APP_KEY

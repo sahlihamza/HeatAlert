@@ -12,6 +12,9 @@
 # Dependencies (built inside Docker multi-stage)
 /vendor/
 /node_modules/
+/ml-service/.venv/
+/ml-service/data/
+/ml-service/artifacts/
 
 # Local build artifacts
 /public/build/

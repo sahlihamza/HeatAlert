@@ -120,7 +120,8 @@ def load_model_bundle(model_path: Path) -> tuple[Any | None, dict[str, Any], str
 def make_model_version(metadata: dict[str, Any]) -> str:
     selected = metadata.get("selected_model", "unknown")
     date_max = metadata.get("schema", {}).get("date_max", "unknown-date")
-    return f"{selected}:{date_max}"
+    source = ":synthetic-bootstrap" if metadata.get("training_data_source") == "synthetic_bootstrap" else ""
+    return f"{selected}:{date_max}{source}"
 
 
 # ══════════════════════════════════════════════════════════════
@@ -193,6 +194,7 @@ class FireSpreadBatchResponse(BaseModel):
     predictions: list[FireSpreadPredictionOutput]
     summary: dict[str, Any]
     model_version: str
+    warnings: list[str] = Field(default_factory=list)
 
 
 def default_fire_model_path() -> Path:
@@ -287,6 +289,7 @@ def create_app(
     model_path: Path | None = None,
     model: Any | None = None,
     fire_model_path: Path | None = None,
+    fire_model: Any | None = None,
     equipment_model: Any | None = None,
 ) -> FastAPI:
     resolved_path = model_path or default_model_path()
@@ -308,7 +311,12 @@ def create_app(
             app.state.model_error = error
 
         # 2. Modèle Feu Propagation (LightGBM)
-        loaded_fire_model, fire_metadata, fire_error = load_fire_model_bundle(resolved_fire_path)
+        if fire_model is not None:
+            loaded_fire_model = fire_model
+            fire_metadata = {"model_version": "test-injected-fire-model"}
+            fire_error = None
+        else:
+            loaded_fire_model, fire_metadata, fire_error = load_fire_model_bundle(resolved_fire_path)
         app.state.fire_model = loaded_fire_model
         app.state.fire_metadata = fire_metadata
         app.state.fire_model_error = fire_error
@@ -339,21 +347,66 @@ def create_app(
         return {
             "service": "HeatAlert ML API",
             "version": "2.1.0",
-            "endpoints": ["/predict", "/predict/feu", "/predict/equipements", "/health", "/docs"],
+            "endpoints": ["/predict", "/predict/feu", "/predict/equipements", "/health", "/ready", "/docs"],
         }
 
     @app.get("/health")
     def health(request: Request) -> dict[str, Any]:
+        metadata = getattr(request.app.state, "metadata", {})
+        fire_metadata = getattr(request.app.state, "fire_metadata", {})
+        equipment_metadata = getattr(request.app.state, "equipment_metadata", {})
+        model_reports = (metadata, fire_metadata, equipment_metadata)
+        validated = all(report.get("production_validated") is True for report in model_reports)
         return {
             "status": "ok",
             "model_loaded": getattr(request.app.state, "model", None) is not None,
             "model_error": getattr(request.app.state, "model_error", None),
+            "model_training_data_source": metadata.get("training_data_source", "unknown"),
             "fire_model_loaded": getattr(request.app.state, "fire_model", None) is not None,
             "fire_model_error": getattr(request.app.state, "fire_model_error", None),
+            "fire_model_training_data_source": fire_metadata.get("training_data_source", "unknown"),
             "fire_model_type": "LightGBM Classifier",
             "equipment_model_loaded": getattr(request.app.state, "equipment_model", None) is not None,
             "equipment_model_error": getattr(request.app.state, "equipment_model_error", None),
+            "equipment_model_training_data_source": equipment_metadata.get("training_data_source", "unknown"),
             "equipment_model_type": "Random Forest Classifier",
+            "production_validated": validated,
+        }
+
+    @app.get("/ready")
+    def readiness(request: Request) -> dict[str, Any]:
+        models = {
+            "outage": getattr(request.app.state, "model", None) is not None,
+            "fire_spread": getattr(request.app.state, "fire_model", None) is not None,
+            "equipment_risk": getattr(request.app.state, "equipment_model", None) is not None,
+        }
+        if not all(models.values()):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "status": "not_ready",
+                    "models": models,
+                    "message": "Un ou plusieurs artefacts de modèle n'ont pas pu être chargés.",
+                },
+            )
+        metadata = getattr(request.app.state, "metadata", {})
+        fire_metadata = getattr(request.app.state, "fire_metadata", {})
+        equipment_metadata = getattr(request.app.state, "equipment_metadata", {})
+        model_reports = (metadata, fire_metadata, equipment_metadata)
+        sources = [report.get("training_data_source", "unknown") for report in model_reports]
+        validated = all(report.get("production_validated") is True for report in model_reports)
+        if all(source == "synthetic_bootstrap" for source in sources):
+            source = "synthetic_bootstrap"
+        elif all(source in {"real", "production"} for source in sources):
+            source = "real"
+        else:
+            source = "mixed_or_unknown"
+        return {
+            "status": "ready",
+            "models": models,
+            "training_data_source": source,
+            "production_validated": validated,
+            "warning": None if validated else "Modèles bootstrap ou non vérifiés : remplacer les artefacts par des entraînements sur données réelles avant usage décisionnel.",
         }
 
     # ══════════════════════════════════════════════════════════
@@ -431,6 +484,10 @@ def create_app(
             "Prototype expérimental: les métriques actuelles ne démontrent pas une fiabilité en production.",
             "La probabilité n'est pas calibrée pour un usage décisionnel.",
         ]
+        if metadata.get("training_data_source") == "synthetic_bootstrap":
+            warnings.append(
+                "Modèle bootstrap entraîné sur des données synthétiques; probabilité non validée sur des coupures réelles."
+            )
         if payload.reference_at.tzinfo is None:
             warnings.append("reference_at sans fuseau: UTC utilisé par défaut.")
         return PredictionResponse(
@@ -639,7 +696,14 @@ def create_app(
             total_cells=len(results),
             predictions=results,
             summary=counts,
-            model_version="lightgbm_fire_spread:v1_calibrated",
+            model_version=str(
+                getattr(request.app.state, "fire_metadata", {}).get(
+                    "model_version", "lightgbm_fire_spread:v1"
+                )
+            ),
+            warnings=[
+                "Modèle bootstrap entraîné sur des données synthétiques; risque non validé sur des propagations observées."
+            ] if getattr(request.app.state, "fire_metadata", {}).get("training_data_source") == "synthetic_bootstrap" else [],
         )
 
     return app

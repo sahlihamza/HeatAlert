@@ -144,6 +144,35 @@ elif [ "$RUN_SEED" = "true" ]; then
     echo "[entrypoint] RUN_SEED=true ignore : activez RUN_MIGRATIONS=true aussi"
 fi
 
+# Lance l'API ML locale, utilisee par Laravel via HEATALERT_ML_URL.
+echo "[entrypoint] Demarrage API ML sur 127.0.0.1:8001"
+cd /opt/heatalert-ml
+/opt/heatalert-ml/.venv/bin/python -m uvicorn app.main:app \
+    --host 127.0.0.1 --port 8001 --workers 1 &
+ML_PID=$!
+cd /var/www
+
+ML_READY=false
+for _attempt in $(seq 1 30); do
+    if curl -fsS http://127.0.0.1:8001/ready >/dev/null 2>&1; then
+        ML_READY=true
+        break
+    fi
+    if ! kill -0 "$ML_PID" 2>/dev/null; then
+        echo "[entrypoint] ERREUR: l'API ML s'est arretee au demarrage"
+        wait "$ML_PID" || true
+        exit 1
+    fi
+    sleep 2
+done
+if [ "$ML_READY" != "true" ]; then
+    echo "[entrypoint] ERREUR: les modeles ML ne sont pas prets apres 60 secondes"
+    kill "$ML_PID" 2>/dev/null || true
+    wait "$ML_PID" 2>/dev/null || true
+    exit 1
+fi
+echo "[entrypoint] API ML prete (modeles bootstrap synthetiques)"
+
 # php-fpm en mode demon (herite de lenv du shell, y compris APP_KEY exportee)
 php-fpm -D
 
@@ -155,5 +184,20 @@ for t in /etc/nginx/templates/*.template; do
     echo "[entrypoint] nginx conf -> $out (port $PORT)"
 done
 
-# nginx en avant-plan
-nginx -g 'daemon off;'
+# Garde l'API ML et nginx supervises dans le meme conteneur Render.
+nginx -g 'daemon off;' &
+NGINX_PID=$!
+
+cleanup() {
+    kill "$NGINX_PID" "$ML_PID" 2>/dev/null || true
+    wait "$NGINX_PID" 2>/dev/null || true
+    wait "$ML_PID" 2>/dev/null || true
+}
+trap cleanup INT TERM EXIT
+
+while kill -0 "$ML_PID" 2>/dev/null && kill -0 "$NGINX_PID" 2>/dev/null; do
+    sleep 2
+done
+
+echo "[entrypoint] nginx ou l'API ML s'est arretee; arret du conteneur"
+exit 1

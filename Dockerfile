@@ -7,6 +7,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx \
     curl \
     gettext-base \
+    python3 \
+    python3-venv \
+    libgomp1 \
     git \
     unzip \
     libzip-dev \
@@ -21,7 +24,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pcntl \
     bcmath \
     gd \
+    && sed -i 's/^pm = dynamic$/pm = ondemand/; s/^pm.max_children = 5$/pm.max_children = 2/' /usr/local/etc/php-fpm.d/www.conf \
     && apt-get clean && rm -rf /var/lib/apt/lists/* /var/www/html
+
+# Keep the ML API in this Render image so Laravel can reach it on localhost.
+# Bootstrap model artifacts are generated reproducibly during the image build.
+COPY ml-service /opt/heatalert-ml
+RUN python3 -m venv /opt/heatalert-ml/.venv \
+    && /opt/heatalert-ml/.venv/bin/pip install --no-cache-dir -r /opt/heatalert-ml/requirements-runtime.txt \
+    && cd /opt/heatalert-ml \
+    && /opt/heatalert-ml/.venv/bin/python bootstrap_synthetic_models.py \
+    && chown -R www-data:www-data /opt/heatalert-ml/artifacts
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
@@ -63,9 +76,13 @@ RUN mkdir -p storage/framework/{cache,sessions,views} storage/logs storage/app/p
     && chown -R www-data:www-data storage bootstrap/cache
 
 ENV PORT=8080
+ENV HEATALERT_ML_URL=http://127.0.0.1:8001
+ENV OMP_NUM_THREADS=1
+ENV OPENBLAS_NUM_THREADS=1
+ENV MKL_NUM_THREADS=1
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-    CMD curl -fsS "http://127.0.0.1:${PORT}/up" || exit 1
+    CMD curl -fsS http://127.0.0.1:8001/ready && curl -fsS "http://127.0.0.1:${PORT}/up" || exit 1
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

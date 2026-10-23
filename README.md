@@ -96,9 +96,13 @@ php artisan steg:sync-coupures --fresh
 
 ---
 
-## 🤖 Microservice Machine Learning (Prédiction des Coupures & FastAPI)
+## 🤖 Microservice Machine Learning (FastAPI)
 
-Le microservice d'intelligence artificielle est situé dans le dossier `ml-service/`. Il expose une API REST haute performance basée sur **FastAPI** et un modèle calibré **Scikit-Learn** (`artifacts/latest/heatalert_model.joblib`).
+L'image Docker de production démarre Laravel et l'API FastAPI locale (`127.0.0.1:8001`). Pendant le build de l'image, `ml-service/bootstrap_synthetic_models.py` génère, entraîne et vérifie les artefacts des trois modèles (`artifacts/latest/`). Le build échoue si un modèle ne peut pas être chargé ou ne retourne pas une probabilité valide. Les artefacts ne sont pas enregistrés dans Git : ils sont créés dans l'image publiée sur GHCR.
+
+Les modèles générés automatiquement sont des **prototypes d'amorçage entraînés sur des données synthétiques**. L'API le signale dans `/health`, `/ready` et les réponses de prédiction. Ils permettent de valider le fonctionnement technique des services, mais ne sont pas validés pour des décisions réelles. Pour une utilisation opérationnelle, réentraîner les modèles avec des historiques réels de coupures STEG, de propagation de feux et d'incidents d'équipements, puis remplacer les artefacts.
+
+L'endpoint `/ready` vérifie que les trois fichiers de modèle sont chargés. L'endpoint `/health` expose leur état et indique `production_validated: false` pour les modèles bootstrap.
 
 ### 📦 Installation et Lancement du Microservice ML
 

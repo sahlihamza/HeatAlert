@@ -77,6 +77,20 @@ jobs:
       - name: Run Laravel tests
         run: php artisan test
 
+      - name: Set up Python 3.11 for ML API tests
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: ml-service/requirements-runtime.txt
+
+      - name: Install ML API dependencies
+        run: python -m pip install -r ml-service/requirements-runtime.txt pytest httpx
+
+      - name: Run ML API tests
+        working-directory: ml-service
+        run: python -m pytest -q tests
+
   build-and-deploy:
     name: Build image and deploy to Render
     runs-on: ubuntu-24.04
@@ -102,6 +116,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
+          platforms: linux/amd64
           push: true
           tags: |
             ghcr.io/sahlihamza/heatalert:latest

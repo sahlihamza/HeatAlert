@@ -143,6 +143,7 @@ def create_equipment_router() -> APIRouter:
         probability = float(np.clip(probability, 0.01, 0.99))
         risk_level = "high" if probability >= 0.70 else "medium" if probability >= 0.40 else "low"
         metadata = getattr(request.app.state, "equipment_metadata", {})
+        is_synthetic = metadata.get("training_data_source") == "synthetic_bootstrap" or metadata.get("dataset") == "synthetic_bootstrap"
         return EquipmentRiskResponse(
             equipement_id=payload.equipement_id,
             probability=probability,
@@ -153,9 +154,9 @@ def create_equipment_router() -> APIRouter:
             model_version=_model_version(metadata),
             factors=_risk_factors(payload),
             warnings=[
-                "Prototype: entraînement initial réalisé sur données synthétiques.",
-                "La probabilité doit être recalibrée avec des incidents réels d'équipements.",
-            ],
+                "Prototype bootstrap entraîné sur données synthétiques; probabilité non validée sur incidents réels.",
+                "Remplacer et recalibrer le modèle avec un historique réel avant tout usage décisionnel.",
+            ] if is_synthetic else [],
         )
 
     return router

@@ -75,6 +75,34 @@ def test_health_without_model_is_explicit(tmp_path: Path):
     assert response.json()["model_loaded"] is False
 
 
+def test_ready_requires_all_production_models(tmp_path: Path):
+    with TestClient(
+        create_app(model_path=tmp_path / "missing.joblib", model=FakeModel())
+    ) as client:
+        response = client.get("/ready")
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["models"] == {
+        "outage": True,
+        "fire_spread": False,
+        "equipment_risk": False,
+    }
+
+
+def test_ready_reports_loaded_models_and_bootstrap_validation_status():
+    app = create_app(
+        model=FakeModel(),
+        fire_model=FakeModel(),
+        equipment_model=FakeModel(),
+    )
+    with TestClient(app) as client:
+        response = client.get("/ready")
+
+    assert response.status_code == 200
+    assert all(response.json()["models"].values())
+    assert response.json()["production_validated"] is False
+
+
 def test_predict_returns_probability_with_injected_model(tmp_path: Path):
     with TestClient(
         create_app(model_path=tmp_path / "ignored.joblib", model=FakeModel())
